@@ -9,7 +9,9 @@ contract FIONFT is ERC721, ERC721Burnable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    constructor() public ERC721("FIO NFT", "FIO Protocol") {}
+    constructor() public ERC721("FIO Protocol NFT", "FIO") {
+
+    }
 
     function sendnft(address owner, string memory tokenURI)
         public
