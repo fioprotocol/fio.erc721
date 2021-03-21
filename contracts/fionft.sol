@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract FIONFT is ERC721, ERC721Burnable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
-    uint8 constant MAXENT = 7;
+    uint8 constant MINCUST = 7;
     address owner;
 
     struct custodian {
@@ -20,48 +20,44 @@ contract FIONFT is ERC721, ERC721Burnable {
       int activation_count;
       bool active;
     }
+    int custodian_count;
 
     struct oracle {
       mapping ( address => bool) registered;
       int activation_count;
       bool active;
     }
+    int oracle_count;
 
     struct pending {
       mapping (address => bool) approver;
       int approvers;
-      address recipient;
-      uint256 amount;
-      bool wrap;
+      address account;
+      string tokenURI;
     }
+
+    event unwrapped(string fioaddress, uint256 tokenId);
+    event wrapped(address ethaddress, string tokenURI, uint256 obtid);
 
     mapping ( address => oracle) oracles;
     mapping ( address => custodian) custodians;
     mapping ( uint256 => pending) approvals; // uint256 hash can be any obtid
 
-    constructor() public ERC721("FIO Protocol NFT", "FIO") {
+    constructor( address[] memory newcustodians ) public ERC721("FIO Protocol NFT", "FIO") {
+            require(newcustodians.length == 10, "wFIO cannot deploy without 10 custodians");
       owner = msg.sender;
+
+      for (uint8 i = 0; i < 10; i++ ) {
+        require(newcustodians[i] != owner, "Contract owner cannot be custodian");
+        custodians[newcustodians[i]].activation_count = 0; // For clarity - activation_count is zero for these custodians so contract owner may unregister at will
+        custodians[newcustodians[i]].active = true;
+        custodians[newcustodians[i]].registered[msg.sender] = true;
+      }
+      custodian_count = 10;
+      oracle_count = 0;
+
     }
 
-    modifier ownerAndCustodian {
-      require(
-        ((msg.sender == owner) ||
-         (custodians[msg.sender].active == true)),
-          "Only contract owner or custodians may call this function."
-      );
-      _;
-    }
-    /*
-    modifier allPrincipals {
-      require(
-        ((msg.sender == owner) ||
-         (custodians[msg.sender].active == true) ||
-         (oracles[msg.sender].active == true )),
-          "Only contract owner, custodians or oracles may call this function."
-      );
-      _;
-    }
-    */
     modifier oracleOnly {
       require(oracles[msg.sender].active == true,
          "Only a wFIO oracle may call this function."
@@ -76,7 +72,6 @@ contract FIONFT is ERC721, ERC721Burnable {
       _;
     }
 
-
     modifier ownerOnly {
       require( msg.sender == owner,
           "Only contract owner can call this function."
@@ -84,42 +79,62 @@ contract FIONFT is ERC721, ERC721Burnable {
       _;
     }
 
-    function wrap(address ethaddress, string memory tokenURI, uint256 obtid) public ownerOnly returns (uint256)
+    function wrap(address account, string memory tokenURI, uint256 obtid) public oracleOnly returns (uint256)
     {
-
-      require(ethaddress != address(0), "Invalid account");
+      require(account != address(0), "Invalid account");
       require(obtid != uint256(0), "Invalid obtid");
+      uint256 tokenId = 0;
+      int reqoracles = ((oracle_count / 3) * 2 + 1);
+      if (approvals[obtid].approvers < reqoracles) {
+        require(approvals[obtid].approver[msg.sender] == false, "oracle has already approved this obtid");
+        approvals[obtid].approvers++;
+        approvals[obtid].approver[msg.sender] = true;
+      }
+      if (approvals[obtid].approvers == reqoracles) {
+       require(approvals[obtid].approver[msg.sender] == true, "An approving oracle must execute unwrap");
 
-        uint256 tokenId = 0;
-        {
-          _tokenIds.increment();
-           tokenId = _tokenIds.current();
-          _mint(ethaddress, tokenId);
-          _setTokenURI(tokenId, tokenURI);
+         _tokenIds.increment();
+          tokenId = _tokenIds.current();
+         _mint(account, tokenId);
+         _setTokenURI(tokenId, tokenURI);
+         emit wrapped(account, tokenURI, obtid);
+        delete approvals[obtid];
+      }
+      if (approvals[obtid].approvers == 1) {
+        approvals[obtid].account = account;
+        approvals[obtid].tokenURI = tokenURI;
+      }
+      if (approvals[obtid].approvers > 1) {
+        require(approvals[obtid].account == account, "recipient account does not match prior approvals");
+        string memory t = approvals[obtid].tokenURI;
+        require(bytes(t).length == bytes(tokenURI).length &&
+          keccak256(bytes(t)) == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
+      }
 
-        }
         return tokenId;
     }
 
-    function unwrap(address ethaddress, uint256 tokenId) public ownerOnly {
-        require(ownerOf(tokenId) == ethaddress);
+      function unwrap(string memory fioaddress, uint256 tokenId) public {
+        require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
+        require(ownerOf(tokenId) == msg.sender);
         _burn(tokenId);
+        emit unwrapped(fioaddress, tokenId);
       }
 
 
-      function getCustodian(address ethaddress) public view returns (int, bool) {
+      function getCustodian(address ethaddress) public view returns (int, bool, int) {
         require(ethaddress != address(0), "Invalid address");
-        return (custodians[ethaddress].activation_count, custodians[ethaddress].active);
+        return (custodians[ethaddress].activation_count, custodians[ethaddress].active, custodian_count);
       }
 
-      function getOracle(address ethaddress) public view returns (int, bool) {
+      function getOracle(address ethaddress) public view returns (int, bool, int) {
         require(ethaddress != address(0), "Invalid address");
-        return (oracles[ethaddress].activation_count, oracles[ethaddress].active);
+        return (oracles[ethaddress].activation_count, oracles[ethaddress].active, oracle_count);
       }
 
-      function getApprovals(uint256 obtid) public view returns (int, address, uint256) {
+      function getApprovals(uint256 obtid) public view returns (int, address, string memory) {
         require(obtid != uint256(0), "Invalid obtid");
-        return (approvals[obtid].approvers, approvals[obtid].recipient, approvals[obtid].amount);
+        return (approvals[obtid].approvers, approvals[obtid].account, approvals[obtid].tokenURI);
       }
 
       function regoracle(address ethaddress) public custodianOnly {
@@ -127,26 +142,27 @@ contract FIONFT is ERC721, ERC721Burnable {
         require(ethaddress != msg.sender, "Cannot register self");
         require(oracles[ethaddress].active == false, "Oracle is already registered");
         require(oracles[ethaddress].registered[msg.sender] == false, "msg.sender has already registered this oracle");
-        if (oracles[ethaddress].activation_count < MAXENT) {
+        if (oracles[ethaddress].activation_count < MINCUST) {
           oracles[ethaddress].activation_count++;
           oracles[ethaddress].registered[msg.sender] = true;
         }
-        if (oracles[ethaddress].activation_count == MAXENT){
+        if (oracles[ethaddress].activation_count == MINCUST){
           oracles[ethaddress].active=true;
+          oracle_count++;
         }
       }
 
-      function unregoracle(address ethaddress) public ownerAndCustodian {
+      function unregoracle(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
-        require(ethaddress != msg.sender, "Cannot unregister self");
+        require(oracle_count > 0, "No oracles remaining");
         require(oracles[ethaddress].active == true, "Oracle is not registered");
-        require(oracles[ethaddress].registered[msg.sender] == true, "msg.sender has not registered this oracle");
         if (oracles[ethaddress].activation_count > 0) {
           oracles[ethaddress].activation_count--;
           delete oracles[ethaddress].registered[msg.sender];
         }
         if (oracles[ethaddress].activation_count == 0) {
             delete oracles[ethaddress];
+            oracle_count--;
         }
 
       } // unregoracle
@@ -157,26 +173,27 @@ contract FIONFT is ERC721, ERC721Burnable {
         require(ethaddress != msg.sender, "Cannot register self");
         require(custodians[ethaddress].active == false, "Custodian is already registered");
         require(custodians[ethaddress].registered[msg.sender] == false,  "msg.sender has already registered this custodian");
-        if (custodians[ethaddress].activation_count < MAXENT) {
+        if (custodians[ethaddress].activation_count < MINCUST) {
           custodians[ethaddress].activation_count++;
           custodians[ethaddress].registered[msg.sender] = true;
         }
-        if (custodians[ethaddress].activation_count == MAXENT) {
+        if (custodians[ethaddress].activation_count == MINCUST) {
           custodians[ethaddress].active = true;
+          custodian_count++;
         }
       }
 
-      function unregcust(address ethaddress) public ownerAndCustodian() {
+      function unregcust(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
-        require(ethaddress != msg.sender, "Cannot unregister self");
         require(custodians[ethaddress].active == true, "Custodian is not registered");
-        require(custodians[ethaddress].registered[msg.sender] == true, "msg.sender has not registered this custodian");
+        require(custodian_count > MINCUST, "Must contain 7 custodians");
         if (custodians[ethaddress].activation_count > 0) {
           custodians[ethaddress].activation_count--;
           delete custodians[ethaddress].registered[msg.sender];
         }
         if (custodians[ethaddress].activation_count == 0) {
             delete custodians[ethaddress];
+            custodian_count--;
         }
       } //unregcustodian
 
