@@ -33,7 +33,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       mapping (address => bool) approver;
       int approvers;
       address account;
-      string tokenURI;
+      bytes32 tokenURI;
     }
 
     event unwrapped(string fioaddress, uint256 tokenId);
@@ -102,15 +102,13 @@ contract FIONFT is ERC721, ERC721Burnable {
       }
       if (approvals[obtid].approvers == 1) {
         approvals[obtid].account = account;
-        approvals[obtid].tokenURI = tokenURI;
+        approvals[obtid].tokenURI = keccak256(bytes(tokenURI));
       }
       if (approvals[obtid].approvers > 1) {
         require(approvals[obtid].account == account, "recipient account does not match prior approvals");
-        string memory t = approvals[obtid].tokenURI;
-        require(bytes(t).length == bytes(tokenURI).length &&
-          keccak256(bytes(t)) == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
+        require(approvals[obtid].tokenURI.length == bytes(tokenURI).length &&
+          approvals[obtid].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
       }
-
         return tokenId;
     }
 
@@ -132,7 +130,7 @@ contract FIONFT is ERC721, ERC721Burnable {
         return (oracles[ethaddress].activation_count, oracles[ethaddress].active, oracle_count);
       }
 
-      function getApprovals(uint256 obtid) public view returns (int, address, string memory) {
+      function getApprovals(uint256 obtid) public view returns (int, address, bytes32) {
         require(obtid != uint256(0), "Invalid obtid");
         return (approvals[obtid].approvers, approvals[obtid].account, approvals[obtid].tokenURI);
       }
