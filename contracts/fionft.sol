@@ -91,7 +91,7 @@ contract FIONFT is ERC721, ERC721Burnable {
         approvals[obtid].approver[msg.sender] = true;
       }
       if (approvals[obtid].approvers == reqoracles) {
-       require(approvals[obtid].approver[msg.sender] == true, "An approving oracle must execute unwrap");
+       require(approvals[obtid].approver[msg.sender] == true, "An approving oracle must execute wrap");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
