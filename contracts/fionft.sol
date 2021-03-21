@@ -106,8 +106,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       }
       if (approvals[obtid].approvers > 1) {
         require(approvals[obtid].account == account, "recipient account does not match prior approvals");
-        require(approvals[obtid].tokenURI.length == bytes(tokenURI).length &&
-          approvals[obtid].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
+        require(approvals[obtid].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
       }
         return tokenId;
     }
