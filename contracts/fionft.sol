@@ -44,7 +44,7 @@ contract FIONFT is ERC721, ERC721Burnable {
     mapping ( uint256 => pending) approvals; // uint256 hash can be any obtid
 
     constructor( address[] memory newcustodians ) public ERC721("FIO Protocol NFT", "FIO") {
-            require(newcustodians.length == 10, "wFIO cannot deploy without 10 custodians");
+            require(newcustodians.length == 10, "FIONFT cannot deploy without 10 custodians");
       owner = msg.sender;
 
       for (uint8 i = 0; i < 10; i++ ) {
