@@ -83,6 +83,7 @@ contract FIONFT is ERC721, ERC721Burnable {
     {
       require(account != address(0), "Invalid account");
       require(obtid != uint256(0), "Invalid obtid");
+      require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
       if (approvals[obtid].approvers < oracle_count) {
         require(approvals[obtid].approver[msg.sender] == false, "oracle has already approved this obtid");
