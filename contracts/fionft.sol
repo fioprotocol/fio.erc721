@@ -12,32 +12,38 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract FIONFT is ERC721, ERC721Burnable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
-    uint8 constant MINCUST = 7;
+
     address owner;
 
     struct custodian {
-      mapping ( address => bool) registered;
-      int activation_count;
       bool active;
     }
-    int custodian_count;
 
     struct oracle {
-      mapping ( address => bool) registered;
-      int activation_count;
       bool active;
     }
-    int oracle_count;
 
     struct pending {
-      mapping (address => bool) approver;
-      int approvers;
+      mapping (address => bool) approved;
+      int approvals;
       address account;
       bytes32 tokenURI;
     }
 
+    int custodian_count;
+    int oracle_count;
+
+    int uoracmapv;
+    int roracmapv;
+    int rcustmapv;
+    int ucustmapv;
+
     event unwrapped(string fioaddress, uint256 tokenId);
     event wrapped(address ethaddress, string tokenURI, uint256 obtid);
+    event custodian_unregistered(address ethaddress, uint256 eid);
+    event custodian_registered(address ethaddress, uint256 eid);
+    event oracle_unregistered(address ethaddress, uint256 eid);
+    event oracle_registered(address ethaddress, uint256 eid);
 
     mapping ( address => oracle) oracles;
     mapping ( address => custodian) custodians;
@@ -49,9 +55,7 @@ contract FIONFT is ERC721, ERC721Burnable {
 
       for (uint8 i = 0; i < 10; i++ ) {
         require(newcustodians[i] != owner, "Contract owner cannot be custodian");
-        custodians[newcustodians[i]].activation_count = 0; // For clarity - activation_count is zero for these custodians so contract owner may unregister at will
         custodians[newcustodians[i]].active = true;
-        custodians[newcustodians[i]].registered[msg.sender] = true;
       }
       custodian_count = 10;
       oracle_count = 0;
@@ -85,21 +89,21 @@ contract FIONFT is ERC721, ERC721Burnable {
       require(obtid != uint256(0), "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
-      if (approvals[obtid].approvers < oracle_count) {
-        require(approvals[obtid].approver[msg.sender] == false, "oracle has already approved this obtid");
-        approvals[obtid].approvers++;
-        approvals[obtid].approver[msg.sender] = true;
+      if (approvals[obtid].approvals < oracle_count) {
+        require(approvals[obtid].approved[msg.sender] == false, "oracle has already approved this obtid");
+        approvals[obtid].approvals++;
+        approvals[obtid].approved[msg.sender] = true;
       }
-      if (approvals[obtid].approvers == 1) {
+      if (approvals[obtid].approvals == 1) {
         approvals[obtid].account = account;
         approvals[obtid].tokenURI = keccak256(bytes(tokenURI));
       }
-      if (approvals[obtid].approvers > 1) {
+      if (approvals[obtid].approvals > 1) {
         require(approvals[obtid].account == account, "recipient account does not match prior approvals");
         require(approvals[obtid].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
       }
-      if (approvals[obtid].approvers == oracle_count) {
-       require(approvals[obtid].approver[msg.sender] == true, "An approving oracle must execute wrap");
+      if (approvals[obtid].approvals == oracle_count) {
+       require(approvals[obtid].approved[msg.sender] == true, "An approving oracle must execute wrap");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
@@ -119,82 +123,103 @@ contract FIONFT is ERC721, ERC721Burnable {
         emit unwrapped(fioaddress, tokenId);
       }
 
-      function getCustodian(address ethaddress) public view returns (int, bool, int) {
+      function getCustodian(address ethaddress) public view returns (bool, int) {
         require(ethaddress != address(0), "Invalid address");
-        return (custodians[ethaddress].activation_count, custodians[ethaddress].active, custodian_count);
+        return (custodians[ethaddress].active, custodian_count);
       }
 
-      function getOracle(address ethaddress) public view returns (int, bool, int) {
+      function getOracle(address ethaddress) public view returns (bool, int) {
         require(ethaddress != address(0), "Invalid address");
-        return (oracles[ethaddress].activation_count, oracles[ethaddress].active, oracle_count);
+        return (oracles[ethaddress].active, oracle_count);
       }
 
-      function getApprovals(uint256 obtid) public view returns (int, address, bytes32) {
+      function getApproval(uint256 obtid) public view returns (int, address, bytes32) {
         require(obtid != uint256(0), "Invalid obtid");
-        return (approvals[obtid].approvers, approvals[obtid].account, approvals[obtid].tokenURI);
+        return (approvals[obtid].approvals, approvals[obtid].account, approvals[obtid].tokenURI);
       }
 
       function regoracle(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
         require(ethaddress != msg.sender, "Cannot register self");
         require(oracles[ethaddress].active == false, "Oracle is already registered");
-        require(oracles[ethaddress].registered[msg.sender] == false, "msg.sender has already registered this oracle");
+        uint256 id = uint256(keccak256(bytes(abi.encodePacked("ro",ethaddress, roracmapv ))));
+        require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
         int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (oracles[ethaddress].activation_count < reqcust) {
-          oracles[ethaddress].activation_count++;
-          oracles[ethaddress].registered[msg.sender] = true;
+        if (approvals[id].approvals < reqcust) {
+          approvals[id].approvals++;
+          approvals[id].approved[msg.sender] = true;
         }
-        if (oracles[ethaddress].activation_count == reqcust){
+        if (approvals[id].approvals == reqcust){
           oracles[ethaddress].active=true;
           oracle_count++;
+          delete approvals[id];
+          roracmapv++;
+          emit oracle_registered(ethaddress, id);
         }
       }
 
       function unregoracle(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
         require(oracle_count > 0, "No oracles remaining");
+        uint256 id = uint256(keccak256(bytes(abi.encodePacked("uo",ethaddress, uoracmapv))));
         require(oracles[ethaddress].active == true, "Oracle is not registered");
-        if (oracles[ethaddress].activation_count > 0) {
-          oracles[ethaddress].activation_count--;
-          delete oracles[ethaddress].registered[msg.sender];
+        int reqcust = ((custodian_count / 3) * 2 + 1);
+        if (approvals[id].approvals < reqcust) {
+          approvals[id].approvals++;
+          approvals[id].approved[msg.sender] = true;
         }
-        if (oracles[ethaddress].activation_count == 0) {
+        if ( approvals[id].approvals == reqcust) {
+            oracles[ethaddress].active = false;
             delete oracles[ethaddress];
             oracle_count--;
+            delete approvals[id];
+            uoracmapv++;
+            emit oracle_unregistered(ethaddress, id);
         }
 
       } // unregoracle
 
-
       function regcust(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
         require(ethaddress != msg.sender, "Cannot register self");
+        uint256 id = uint256(keccak256(bytes(abi.encodePacked("rc",ethaddress, rcustmapv))));
         require(custodians[ethaddress].active == false, "Custodian is already registered");
-        require(custodians[ethaddress].registered[msg.sender] == false,  "msg.sender has already registered this custodian");
+        require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
         int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (custodians[ethaddress].activation_count < reqcust) {
-          custodians[ethaddress].activation_count++;
-          custodians[ethaddress].registered[msg.sender] = true;
+        if (approvals[id].approvals < reqcust) {
+          approvals[id].approvals++;
+          approvals[id].approved[msg.sender] = true;
         }
-        if (custodians[ethaddress].activation_count == reqcust) {
+        if (approvals[id].approvals == reqcust) {
           custodians[ethaddress].active = true;
           custodian_count++;
+          delete approvals[id];
+          rcustmapv++;
+          emit custodian_registered(ethaddress, id);
         }
       }
 
       function unregcust(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
         require(custodians[ethaddress].active == true, "Custodian is not registered");
-        require(custodian_count > MINCUST, "Must contain 7 custodians");
-        if (custodians[ethaddress].activation_count > 0) {
-          custodians[ethaddress].activation_count--;
-          delete custodians[ethaddress].registered[msg.sender];
+        require(custodian_count > 7, "Must contain 7 custodians");
+        uint256 id = uint256(keccak256(bytes(abi.encodePacked("uc",ethaddress, ucustmapv))));
+        require(approvals[id].approved[msg.sender] == false, "Cannot unregister custodian again");
+        int reqcust = ((custodian_count / 3) * 2 + 1);
+        if (approvals[id].approvals < reqcust) {
+          approvals[id].approvals++;
+          approvals[id].approved[msg.sender] = true;
         }
-        if (custodians[ethaddress].activation_count == 0) {
+        if ( approvals[id].approvals == reqcust) {
+            custodians[ethaddress].active = false;
             delete custodians[ethaddress];
             custodian_count--;
+            delete approvals[id];
+            ucustmapv++;
+            emit custodian_unregistered(ethaddress, id);
         }
       } //unregcustodian
+
 
       // ------------------------------------------------------------------------
       // Don't accept ETH
