@@ -39,7 +39,7 @@ contract FIONFT is ERC721, ERC721Burnable {
     int ucustmapv;
 
     event unwrapped(string fioaddress, uint256 tokenId);
-    event wrapped(address ethaddress, string tokenURI, bytes32 obtid);
+    event wrapped(address ethaddress, string tokenURI, string obtid);
     event custodian_unregistered(address ethaddress, bytes32 eid);
     event custodian_registered(address ethaddress, bytes32 eid);
     event oracle_unregistered(address ethaddress, bytes32 eid);
@@ -83,34 +83,35 @@ contract FIONFT is ERC721, ERC721Burnable {
       _;
     }
 
-    function wrap(address account, string memory tokenURI, bytes32 obtid) public oracleOnly returns (uint256)
+    function wrap(address account, string memory tokenURI, string memory obtid) public oracleOnly returns (uint256)
     {
       require(account != address(0), "Invalid account");
-      require(obtid[0] != 0, "Invalid obtid");
+      require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
-      if (approvals[obtid].approvals < oracle_count) {
-        require(approvals[obtid].approved[msg.sender] == false, "oracle has already approved this obtid");
-        approvals[obtid].approvals++;
-        approvals[obtid].approved[msg.sender] = true;
+      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+      if (approvals[obthash].approvals < oracle_count) {
+        require(approvals[obthash].approved[msg.sender] == false, "oracle has already approved this obtid");
+        approvals[obthash].approvals++;
+        approvals[obthash].approved[msg.sender] = true;
       }
-      if (approvals[obtid].approvals == 1) {
-        approvals[obtid].account = account;
-        approvals[obtid].tokenURI = keccak256(bytes(tokenURI));
+      if (approvals[obthash].approvals == 1) {
+        approvals[obthash].account = account;
+        approvals[obthash].tokenURI = keccak256(bytes(tokenURI));
       }
-      if (approvals[obtid].approvals > 1) {
-        require(approvals[obtid].account == account, "recipient account does not match prior approvals");
-        require(approvals[obtid].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
+      if (approvals[obthash].approvals > 1) {
+        require(approvals[obthash].account == account, "recipient account does not match prior approvals");
+        require(approvals[obthash].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
       }
-      if (approvals[obtid].approvals == oracle_count) {
-       require(approvals[obtid].approved[msg.sender] == true, "An approving oracle must execute wrap");
+      if (approvals[obthash].approvals == oracle_count) {
+       require(approvals[obthash].approved[msg.sender] == true, "An approving oracle must execute wrap");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
          _setTokenURI(tokenId, tokenURI);
          emit wrapped(account, tokenURI, obtid);
-        delete approvals[obtid];
+        delete approvals[obthash];
       }
 
         return tokenId;
@@ -133,10 +134,12 @@ contract FIONFT is ERC721, ERC721Burnable {
         return (oracles[ethaddress].active, oracle_count);
       }
 
-      function getApproval(bytes32 obtid) public view returns (int256, address, bytes32) {
-        require(obtid[0] != 0, "Invalid obtid");
-        return (approvals[obtid].approvals, approvals[obtid].account, approvals[obtid].tokenURI);
+      function getApproval(string memory obtid) public view returns (int, address, bytes32) {
+        require(bytes(obtid).length > 0, "Invalid obtid");
+        bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].tokenURI);
       }
+
 
       function regoracle(address ethaddress) public custodianOnly {
         require(ethaddress != address(0), "Invalid address");
