@@ -83,7 +83,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       _;
     }
 
-    function wrap(address account, string memory tokenURI, string memory obtid) public oracleOnly returns (uint256)
+    function wrapnft(address account, string memory tokenURI, string memory obtid) public oracleOnly returns (uint256)
     {
       require(account != address(0), "Invalid account");
       require(bytes(obtid).length > 0, "Invalid obtid");
@@ -117,7 +117,7 @@ contract FIONFT is ERC721, ERC721Burnable {
         return tokenId;
     }
 
-      function unwrap(string memory fioaddress, uint256 tokenId) public {
+      function unwrapnft(string memory fioaddress, uint256 tokenId) public {
         require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
         require(ownerOf(tokenId) == msg.sender);
         _burn(tokenId);
