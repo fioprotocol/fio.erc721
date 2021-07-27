@@ -3,17 +3,17 @@
 // Adam Androulidakis 3/2021
 // Prototype: Do not use in production
 
-pragma solidity ^0.6.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721Burnable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/counters.sol";
 
-contract FIONFT is ERC721, ERC721Burnable {
+contract FIONFT is ERC721 {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
     address owner;
+    string baseURI;
 
     struct custodian {
       bool active;
@@ -27,7 +27,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       mapping (address => bool) approved;
       int approvals;
       address account;
-      bytes32 tokenURI;
+      bytes32 URI;
     }
 
     int custodian_count;
@@ -39,17 +39,18 @@ contract FIONFT is ERC721, ERC721Burnable {
     int ucustmapv;
 
     event unwrapped(string fioaddress, uint256 tokenId);
-    event wrapped(address ethaddress, string tokenURI, string obtid);
-    event custodian_unregistered(address ethaddress, bytes32 eid);
-    event custodian_registered(address ethaddress, bytes32 eid);
-    event oracle_unregistered(address ethaddress, bytes32 eid);
-    event oracle_registered(address ethaddress, bytes32 eid);
+    event wrapped(address account, string URI, string obtid);
+    event custodian_unregistered(address account, bytes32 eid);
+    event custodian_registered(address account, bytes32 eid);
+    event oracle_unregistered(address account, bytes32 eid);
+    event oracle_registered(address account, bytes32 eid);
 
     mapping ( address => oracle) oracles;
+    address[] oraclelist;
     mapping ( address => custodian) custodians;
     mapping ( bytes32 => pending) approvals; // uint256 hash can be any obtid
 
-    constructor( address[] memory newcustodians ) public ERC721("FIO Protocol NFT", "FIO") {
+    constructor( address[] memory newcustodians, string memory URI ) public ERC721("FIO Protocol NFT", "FIO") {
             require(newcustodians.length == 10, "FIONFT cannot deploy without 10 custodians");
       owner = msg.sender;
 
@@ -59,7 +60,12 @@ contract FIONFT is ERC721, ERC721Burnable {
       }
       custodian_count = 10;
       oracle_count = 0;
+      baseURI = URI;
 
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return baseURI;
     }
 
     modifier oracleOnly {
@@ -83,7 +89,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       _;
     }
 
-    function wrapnft(address account, string memory tokenURI, string memory obtid) public oracleOnly returns (uint256)
+    function wrapnft(address account, string memory obtid) public oracleOnly returns (uint256)
     {
       require(account != address(0), "Invalid account");
       require(bytes(obtid).length > 0, "Invalid obtid");
@@ -97,11 +103,11 @@ contract FIONFT is ERC721, ERC721Burnable {
       }
       if (approvals[obthash].approvals == 1) {
         approvals[obthash].account = account;
-        approvals[obthash].tokenURI = keccak256(bytes(tokenURI));
+        approvals[obthash].URI = keccak256(bytes(obtid));
       }
       if (approvals[obthash].approvals > 1) {
         require(approvals[obthash].account == account, "recipient account does not match prior approvals");
-        require(approvals[obthash].tokenURI == keccak256(bytes(tokenURI)), "tokenURI does not match prior approvals");
+        require(approvals[obthash].URI == keccak256(bytes(obtid)), "obtid does not match prior approvals");
       }
       if (approvals[obthash].approvals == oracle_count) {
        require(approvals[obthash].approved[msg.sender] == true, "An approving oracle must execute wrap");
@@ -109,8 +115,7 @@ contract FIONFT is ERC721, ERC721Burnable {
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
-         _setTokenURI(tokenId, tokenURI);
-         emit wrapped(account, tokenURI, obtid);
+         emit wrapped(account, obtid, tokenURI(tokenId));
         delete approvals[obthash];
       }
 
@@ -124,28 +129,33 @@ contract FIONFT is ERC721, ERC721Burnable {
         emit unwrapped(fioaddress, tokenId);
       }
 
-      function getCustodian(address ethaddress) public view returns (bool, int) {
-        require(ethaddress != address(0), "Invalid address");
-        return (custodians[ethaddress].active, custodian_count);
+      function getCustodian(address account) public view returns (bool, int) {
+        require(account != address(0), "Invalid address");
+        return (custodians[account].active, custodian_count);
       }
 
-      function getOracle(address ethaddress) public view returns (bool, int) {
-        require(ethaddress != address(0), "Invalid address");
-        return (oracles[ethaddress].active, oracle_count);
+      function getOracle(address account) public view returns (bool, int) {
+        require(account != address(0), "Invalid address");
+        return (oracles[account].active, oracle_count);
       }
 
       function getApproval(string memory obtid) public view returns (int, address, bytes32) {
         require(bytes(obtid).length > 0, "Invalid obtid");
         bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].tokenURI);
+        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].URI);
       }
 
 
-      function regoracle(address ethaddress) public custodianOnly {
-        require(ethaddress != address(0), "Invalid address");
-        require(ethaddress != msg.sender, "Cannot register self");
-        require(oracles[ethaddress].active == false, "Oracle is already registered");
-        bytes32 id = keccak256(bytes(abi.encodePacked("ro",ethaddress, roracmapv )));
+      function getOracles() public view returns(address[] memory) {
+        return oraclelist;
+      }
+
+
+      function regoracle(address account) public custodianOnly {
+        require(account != address(0), "Invalid address");
+        require(account != msg.sender, "Cannot register self");
+        require(oracles[account].active == false, "Oracle is already registered");
+        bytes32 id = keccak256(bytes(abi.encodePacked("ro",account, roracmapv )));
         require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
@@ -153,40 +163,48 @@ contract FIONFT is ERC721, ERC721Burnable {
           approvals[id].approved[msg.sender] = true;
         }
         if (approvals[id].approvals == reqcust){
-          oracles[ethaddress].active=true;
+          oracles[account].active=true;
           oracle_count++;
+          oraclelist.push(account);
           delete approvals[id];
           roracmapv++;
-          emit oracle_registered(ethaddress, id);
+          emit oracle_registered(account, id);
         }
       }
 
-      function unregoracle(address ethaddress) public custodianOnly {
-        require(ethaddress != address(0), "Invalid address");
+      function unregoracle(address account) public custodianOnly {
+        require(account != address(0), "Invalid address");
         require(oracle_count > 0, "No oracles remaining");
-        bytes32 id = keccak256(bytes(abi.encodePacked("uo",ethaddress, uoracmapv)));
-        require(oracles[ethaddress].active == true, "Oracle is not registered");
+        bytes32 id = keccak256(bytes(abi.encodePacked("uo",account, uoracmapv)));
+        require(oracles[account].active == true, "Oracle is not registered");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
           approvals[id].approvals++;
           approvals[id].approved[msg.sender] = true;
         }
         if ( approvals[id].approvals == reqcust) {
-            oracles[ethaddress].active = false;
-            delete oracles[ethaddress];
+            oracles[account].active = false;
+            delete oracles[account];
             oracle_count--;
             delete approvals[id];
             uoracmapv++;
-            emit oracle_unregistered(ethaddress, id);
+            for(uint16 i = 0; i <= oraclelist.length - 1; i++) {
+              if(oraclelist[i] == account) {
+                oraclelist[i] = oraclelist[oraclelist.length - 1];
+                oraclelist.pop();
+                break;
+              }
+            }
+            emit oracle_unregistered(account, id);
         }
 
       } // unregoracle
 
-      function regcust(address ethaddress) public custodianOnly {
-        require(ethaddress != address(0), "Invalid address");
-        require(ethaddress != msg.sender, "Cannot register self");
-        bytes32 id = keccak256(bytes(abi.encodePacked("rc",ethaddress, rcustmapv)));
-        require(custodians[ethaddress].active == false, "Custodian is already registered");
+      function regcust(address account) public custodianOnly {
+        require(account != address(0), "Invalid address");
+        require(account != msg.sender, "Cannot register self");
+        bytes32 id = keccak256(bytes(abi.encodePacked("rc",account, rcustmapv)));
+        require(custodians[account].active == false, "Custodian is already registered");
         require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
@@ -194,19 +212,19 @@ contract FIONFT is ERC721, ERC721Burnable {
           approvals[id].approved[msg.sender] = true;
         }
         if (approvals[id].approvals == reqcust) {
-          custodians[ethaddress].active = true;
+          custodians[account].active = true;
           custodian_count++;
           delete approvals[id];
           rcustmapv++;
-          emit custodian_registered(ethaddress, id);
+          emit custodian_registered(account, id);
         }
       }
 
-      function unregcust(address ethaddress) public custodianOnly {
-        require(ethaddress != address(0), "Invalid address");
-        require(custodians[ethaddress].active == true, "Custodian is not registered");
+      function unregcust(address account) public custodianOnly {
+        require(account != address(0), "Invalid address");
+        require(custodians[account].active == true, "Custodian is not registered");
         require(custodian_count > 7, "Must contain 7 custodians");
-        bytes32 id = keccak256(bytes(abi.encodePacked("uc",ethaddress, ucustmapv)));
+        bytes32 id = keccak256(bytes(abi.encodePacked("uc",account, ucustmapv)));
         require(approvals[id].approved[msg.sender] == false, "Cannot unregister custodian again");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
@@ -214,12 +232,12 @@ contract FIONFT is ERC721, ERC721Burnable {
           approvals[id].approved[msg.sender] = true;
         }
         if ( approvals[id].approvals == reqcust) {
-            custodians[ethaddress].active = false;
-            delete custodians[ethaddress];
+            custodians[account].active = false;
+            delete custodians[account];
             custodian_count--;
             delete approvals[id];
             ucustmapv++;
-            emit custodian_unregistered(ethaddress, id);
+            emit custodian_unregistered(account, id);
         }
       } //unregcustodian
 
@@ -227,7 +245,7 @@ contract FIONFT is ERC721, ERC721Burnable {
       // ------------------------------------------------------------------------
       // Don't accept ETH
       // ------------------------------------------------------------------------
-      receive () external payable {
-          revert();
-      }
+      //receive () external payable {
+      //    revert();
+      // }
 }

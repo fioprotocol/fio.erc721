@@ -14,5 +14,5 @@ var Custodians =
 ]
 
 module.exports = function (deployer) {
-  deployer.deploy(FIONFT, Custodians);
+  deployer.deploy(FIONFT, Custodians, "https://path/");
 };
