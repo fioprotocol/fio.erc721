@@ -89,9 +89,10 @@ contract FIONFT is ERC721 {
         return "http://localhost:8080/";
     }
 
-    function tokenURI(uint256 tokenid) public view override returns (string memory)
+    function tokenURI(uint256 _tokenId) public view override returns (string memory)
     {
-      bytes memory content = abi.encodePacked('{"name":"Domain ', attribute[tokenid], '"');
+      require(_exists(_tokenId), "No token");
+      bytes memory content = abi.encodePacked('{"name":"Domain ', attribute[_tokenId], '"');
 
       return string(abi.encodePacked(content,
           ', ',
