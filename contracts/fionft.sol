@@ -13,7 +13,6 @@ contract FIONFT is ERC721 {
     Counters.Counter private _tokenIds;
 
     address owner;
-    string baseURI;
 
     struct custodian {
       bool active;
@@ -27,7 +26,7 @@ contract FIONFT is ERC721 {
       mapping (address => bool) approved;
       int approvals;
       address account;
-      bytes32 URI;
+      bytes32 obtid;
     }
 
     int custodian_count;
@@ -38,8 +37,10 @@ contract FIONFT is ERC721 {
     int rcustmapv;
     int ucustmapv;
 
+    string[] attribute;
+
     event unwrapped(string fioaddress, uint256 tokenId);
-    event wrapped(address account, string URI, string obtid);
+    event wrapped(address account, string domain, string obtid);
     event custodian_unregistered(address account, bytes32 eid);
     event custodian_registered(address account, bytes32 eid);
     event oracle_unregistered(address account, bytes32 eid);
@@ -50,8 +51,8 @@ contract FIONFT is ERC721 {
     mapping ( address => custodian) custodians;
     mapping ( bytes32 => pending) approvals; // uint256 hash can be any obtid
 
-    constructor( address[] memory newcustodians, string memory URI ) public ERC721("FIO Protocol NFT", "FIO") {
-            require(newcustodians.length == 10, "FIONFT cannot deploy without 10 custodians");
+    constructor( address[] memory newcustodians) ERC721("FIO Protocol NFT", "FIO") {
+            require(newcustodians.length == 10, "Cannot deploy");
       owner = msg.sender;
 
       for (uint8 i = 0; i < 10; i++ ) {
@@ -60,62 +61,75 @@ contract FIONFT is ERC721 {
       }
       custodian_count = 10;
       oracle_count = 0;
-      baseURI = URI;
-
-    }
-
-    function _baseURI() internal view virtual override returns (string memory) {
-        return baseURI;
+      attribute.push("null"); //tokenid starts at 1
     }
 
     modifier oracleOnly {
       require(oracles[msg.sender].active == true,
-         "Only a wFIO oracle may call this function."
+         "Only wFIO oracle can call action."
       );
       _;
     }
 
     modifier custodianOnly {
       require(custodians[msg.sender].active == true,
-         "Only a wFIO custodian may call this function."
+         "Only wFIO custodian can call action."
       );
       _;
     }
 
     modifier ownerOnly {
       require( msg.sender == owner,
-          "Only contract owner can call this function."
+          "Only contract owner can call action."
       );
       _;
     }
 
-    function wrapnft(address account, string memory obtid) public oracleOnly returns (uint256)
+    function _baseURI() internal view virtual override returns (string memory) {
+        return "http://localhost:8080/";
+    }
+
+    function tokenURI(uint256 tokenid) public view override returns (string memory)
+    {
+      bytes memory content = abi.encodePacked('{"name":"Domain ', attribute[tokenid], '"');
+
+      return string(abi.encodePacked(content,
+          ', ',
+          '"description": "FIO Domain"',
+          ', ',
+          '"image": "', "ipfs://QmdKqei7KGp1fJCP1tkhNMdm9BwYFXzKLPsbSMSPW325sH", '"',
+          '}'));
+    }
+
+    function wrapnft(address account, string memory domain, string memory obtid) public oracleOnly returns (uint256)
     {
       require(account != address(0), "Invalid account");
+      require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
       bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
       if (approvals[obthash].approvals < oracle_count) {
-        require(approvals[obthash].approved[msg.sender] == false, "oracle has already approved this obtid");
+        require(approvals[obthash].approved[msg.sender] == false, "Already approved");
         approvals[obthash].approvals++;
         approvals[obthash].approved[msg.sender] = true;
       }
       if (approvals[obthash].approvals == 1) {
         approvals[obthash].account = account;
-        approvals[obthash].URI = keccak256(bytes(obtid));
+        approvals[obthash].obtid = keccak256(bytes(obtid));
       }
       if (approvals[obthash].approvals > 1) {
-        require(approvals[obthash].account == account, "recipient account does not match prior approvals");
-        require(approvals[obthash].URI == keccak256(bytes(obtid)), "obtid does not match prior approvals");
+        require(approvals[obthash].account == account, "Account mismatch");
+        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
       }
       if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender] == true, "An approving oracle must execute wrap");
+       require(approvals[obthash].approved[msg.sender] == true, "Oracle must execute");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
-         emit wrapped(account, obtid, tokenURI(tokenId));
+         attribute.push(domain);
+         emit wrapped(account, domain, obtid);
         delete approvals[obthash];
       }
 
@@ -126,6 +140,7 @@ contract FIONFT is ERC721 {
         require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
         require(ownerOf(tokenId) == msg.sender);
         _burn(tokenId);
+        attribute[tokenId] = "";
         emit unwrapped(fioaddress, tokenId);
       }
 
@@ -142,7 +157,7 @@ contract FIONFT is ERC721 {
       function getApproval(string memory obtid) public view returns (int, address, bytes32) {
         require(bytes(obtid).length > 0, "Invalid obtid");
         bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].URI);
+        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].obtid);
       }
 
 
@@ -154,9 +169,9 @@ contract FIONFT is ERC721 {
       function regoracle(address account) public custodianOnly {
         require(account != address(0), "Invalid address");
         require(account != msg.sender, "Cannot register self");
-        require(oracles[account].active == false, "Oracle is already registered");
+        require(oracles[account].active == false, "Oracle already registered");
         bytes32 id = keccak256(bytes(abi.encodePacked("ro",account, roracmapv )));
-        require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
+        require(approvals[id].approved[msg.sender] == false,  "Already approved");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
           approvals[id].approvals++;
@@ -176,7 +191,7 @@ contract FIONFT is ERC721 {
         require(account != address(0), "Invalid address");
         require(oracle_count > 0, "No oracles remaining");
         bytes32 id = keccak256(bytes(abi.encodePacked("uo",account, uoracmapv)));
-        require(oracles[account].active == true, "Oracle is not registered");
+        require(oracles[account].active == true, "Oracle not registered");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
           approvals[id].approvals++;
@@ -204,8 +219,8 @@ contract FIONFT is ERC721 {
         require(account != address(0), "Invalid address");
         require(account != msg.sender, "Cannot register self");
         bytes32 id = keccak256(bytes(abi.encodePacked("rc",account, rcustmapv)));
-        require(custodians[account].active == false, "Custodian is already registered");
-        require(approvals[id].approved[msg.sender] == false,  "msg.sender has already approved this custodian");
+        require(custodians[account].active == false, "Already registered");
+        require(approvals[id].approved[msg.sender] == false,  "Already approved");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
           approvals[id].approvals++;
@@ -222,10 +237,10 @@ contract FIONFT is ERC721 {
 
       function unregcust(address account) public custodianOnly {
         require(account != address(0), "Invalid address");
-        require(custodians[account].active == true, "Custodian is not registered");
+        require(custodians[account].active == true, "Custodian not registered");
         require(custodian_count > 7, "Must contain 7 custodians");
         bytes32 id = keccak256(bytes(abi.encodePacked("uc",account, ucustmapv)));
-        require(approvals[id].approved[msg.sender] == false, "Cannot unregister custodian again");
+        require(approvals[id].approved[msg.sender] == false, "Already unregistered");
         int reqcust = ((custodian_count / 3) * 2 + 1);
         if (approvals[id].approvals < reqcust) {
           approvals[id].approvals++;
@@ -241,11 +256,10 @@ contract FIONFT is ERC721 {
         }
       } //unregcustodian
 
-
       // ------------------------------------------------------------------------
       // Don't accept ETH
       // ------------------------------------------------------------------------
-      //receive () external payable {
-      //    revert();
-      // }
+      receive () external payable {
+          revert();
+       }
 }
