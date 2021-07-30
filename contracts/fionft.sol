@@ -94,7 +94,7 @@ contract FIONFT is ERC721 {
       require(_exists(_tokenId), "No token");
       bytes memory content = abi.encodePacked('{"name":"Domain ', attribute[_tokenId], '"');
 
-      return string(abi.encodePacked(content,
+      return string(abi.encodePacked("data:application/json,", content,
           ', ',
           '"description": "FIO Domain"',
           ', ',
