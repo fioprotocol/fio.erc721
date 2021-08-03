@@ -92,11 +92,11 @@ contract FIONFT is ERC721 {
     function tokenURI(uint256 _tokenId) public view override returns (string memory)
     {
       require(_exists(_tokenId), "No token");
-      bytes memory content = abi.encodePacked('{"name":"Domain ', attribute[_tokenId], '"');
+      bytes memory content = abi.encodePacked('{"name":"Domain: ', attribute[_tokenId], '"');
 
       return string(abi.encodePacked("data:application/json,", content,
           ', ',
-          '"description": "FIO Domain"',
+          '"description": "Create FIO Addresses on your custom FIO Domain."',
           ', ',
           '"image": "', "ipfs://QmdKqei7KGp1fJCP1tkhNMdm9BwYFXzKLPsbSMSPW325sH", '"',
           '}'));
