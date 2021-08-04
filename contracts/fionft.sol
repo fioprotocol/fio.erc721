@@ -38,6 +38,7 @@ contract FIONFT is ERC721 {
     int ucustmapv;
 
     string[] attribute;
+    string _baseURIextended;
 
     event unwrapped(string fioaddress, uint256 tokenId);
     event wrapped(address account, string domain, string obtid);
@@ -58,6 +59,7 @@ contract FIONFT is ERC721 {
       for (uint8 i = 0; i < 10; i++ ) {
         require(newcustodians[i] != owner, "Contract owner cannot be custodian");
         custodians[newcustodians[i]].active = true;
+        _baseURIextended = "https://localhost:5443/";
       }
       custodian_count = 10;
       oracle_count = 0;
@@ -85,21 +87,19 @@ contract FIONFT is ERC721 {
       _;
     }
 
+
+    //function setBaseURI(string memory baseURI_) external custodianOnly()  {
+    //    _baseURIextended = baseURI_;
+    //}
+
     function _baseURI() internal view virtual override returns (string memory) {
-        return "http://localhost:8080/";
+        return _baseURIextended;
     }
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory)
     {
       require(_exists(_tokenId), "No token");
-      bytes memory content = abi.encodePacked('{"name":"Domain: ', attribute[_tokenId], '"');
-
-      return string(abi.encodePacked("data:application/json,", content,
-          ', ',
-          '"description": "Create FIO Addresses on your custom FIO Domain."',
-          ', ',
-          '"image": "', "ipfs://QmdKqei7KGp1fJCP1tkhNMdm9BwYFXzKLPsbSMSPW325sH", '"',
-          '}'));
+      return string(abi.encodePacked(_baseURI(), "nfts/", attribute[_tokenId], ".json"));
     }
 
     function wrapnft(address account, string memory domain, string memory obtid) public oracleOnly returns (uint256)
