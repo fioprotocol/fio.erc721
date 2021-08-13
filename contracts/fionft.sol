@@ -40,7 +40,7 @@ contract FIONFT is ERC721 {
     string[] attribute;
     string _baseURIextended;
 
-    event unwrapped(string fioaddress, uint256 tokenId);
+    event unwrapped(string fioaddress, string domain);
     event wrapped(address account, string domain, string obtid);
     event custodian_unregistered(address account, bytes32 eid);
     event custodian_registered(address account, bytes32 eid);
@@ -141,8 +141,8 @@ contract FIONFT is ERC721 {
         require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
         require(ownerOf(tokenId) == msg.sender);
         _burn(tokenId);
+        emit unwrapped(fioaddress, attribute[tokenId]);
         attribute[tokenId] = "";
-        emit unwrapped(fioaddress, tokenId);
       }
 
       function getCustodian(address account) public view returns (bool, int) {
