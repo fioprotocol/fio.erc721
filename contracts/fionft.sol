@@ -37,7 +37,7 @@ contract FIONFT is ERC721 {
     int rcustmapv;
     int ucustmapv;
 
-    string[] attribute;
+
     string _baseURIextended;
 
     event unwrapped(string fioaddress, string domain);
@@ -49,8 +49,9 @@ contract FIONFT is ERC721 {
 
     mapping ( address => oracle) oracles;
     address[] oraclelist;
-    mapping ( address => custodian) custodians;
-    mapping ( bytes32 => pending) approvals; // uint256 hash can be any obtid
+    mapping ( address => custodian ) custodians;
+    mapping ( uint256 => string ) attribute;
+    mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
 
     constructor( address[] memory newcustodians) ERC721("FIO Protocol NFT", "FIO") {
             require(newcustodians.length == 10, "Cannot deploy");
@@ -63,7 +64,6 @@ contract FIONFT is ERC721 {
       }
       custodian_count = 10;
       oracle_count = 0;
-      attribute.push("null"); //tokenid starts at 1
     }
 
     modifier oracleOnly {
@@ -88,9 +88,9 @@ contract FIONFT is ERC721 {
     }
 
 
-    //function setBaseURI(string memory baseURI_) external custodianOnly()  {
-    //    _baseURIextended = baseURI_;
-    //}
+    function setBaseURI(string memory baseURI_) external custodianOnly()  {
+        _baseURIextended = baseURI_;
+    }
 
     function _baseURI() internal view virtual override returns (string memory) {
         return _baseURIextended;
@@ -129,7 +129,7 @@ contract FIONFT is ERC721 {
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
-         attribute.push(domain);
+         attribute[_tokenIds.current()] = domain;
          emit wrapped(account, domain, obtid);
         delete approvals[obthash];
       }
