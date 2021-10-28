@@ -13,7 +13,6 @@ contract FIONFT is ERC721 {
     Counters.Counter private _tokenIds;
 
     address owner;
-    uint256 constant MINTABLE = 1e16;
 
     struct custodian {
       bool active;
@@ -37,7 +36,6 @@ contract FIONFT is ERC721 {
     int roracmapv;
     int rcustmapv;
     int ucustmapv;
-
 
     string _baseURIextended;
 
