@@ -3,16 +3,17 @@
 // Adam Androulidakis 3/2021
 // Prototype: Do not use in production
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/counters.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract FIONFT is ERC721 {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
     address owner;
+    uint256 constant MINTABLE = 1e16;
 
     struct custodian {
       bool active;
@@ -67,14 +68,14 @@ contract FIONFT is ERC721 {
     }
 
     modifier oracleOnly {
-      require(oracles[msg.sender].active == true,
+      require(oracles[msg.sender].active,
          "Only wFIO oracle can call action."
       );
       _;
     }
 
     modifier custodianOnly {
-      require(custodians[msg.sender].active == true,
+      require(custodians[msg.sender].active,
          "Only wFIO custodian can call action."
       );
       _;
@@ -87,7 +88,6 @@ contract FIONFT is ERC721 {
       _;
     }
 
-
     function setBaseURI(string memory baseURI_) external custodianOnly()  {
         _baseURIextended = baseURI_;
     }
@@ -96,14 +96,12 @@ contract FIONFT is ERC721 {
         return _baseURIextended;
     }
 
-    function tokenURI(uint256 _tokenId) public view override returns (string memory)
-    {
+    function tokenURI(uint256 _tokenId) public view override returns (string memory){
       require(_exists(_tokenId), "No token");
       return string(abi.encodePacked(_baseURI(), "nfts/", attribute[_tokenId], ".json"));
     }
 
-    function wrapnft(address account, string memory domain, string memory obtid) public oracleOnly returns (uint256)
-    {
+    function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly returns (uint256){
       require(account != address(0), "Invalid account");
       require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
@@ -111,7 +109,7 @@ contract FIONFT is ERC721 {
       uint256 tokenId = 0;
       bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
       if (approvals[obthash].approvals < oracle_count) {
-        require(approvals[obthash].approved[msg.sender] == false, "Already approved");
+        require(!approvals[obthash].approved[msg.sender], "Already approved");
         approvals[obthash].approvals++;
         approvals[obthash].approved[msg.sender] = true;
       }
@@ -124,7 +122,7 @@ contract FIONFT is ERC721 {
         require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
       }
       if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender] == true, "Oracle must execute");
+       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
@@ -137,130 +135,129 @@ contract FIONFT is ERC721 {
         return tokenId;
     }
 
-      function unwrapnft(string memory fioaddress, uint256 tokenId) public {
-        require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
-        require(ownerOf(tokenId) == msg.sender);
-        _burn(tokenId);
-        emit unwrapped(fioaddress, attribute[tokenId]);
-        attribute[tokenId] = "";
+    function unwrapnft(string memory fioaddress, uint256 tokenId) public {
+      require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
+      require(ownerOf(tokenId) == msg.sender);
+      _burn(tokenId);
+      emit unwrapped(fioaddress, attribute[tokenId]);
+      attribute[tokenId] = "";
+    }
+
+    function getCustodian(address account) external view returns (bool, int) {
+      require(account != address(0), "Invalid address");
+      return (custodians[account].active, custodian_count);
+    }
+
+    function getOracle(address account) external view returns (bool, int) {
+      require(account != address(0), "Invalid address");
+      return (oracles[account].active, oracle_count);
+    }
+
+    function getApproval(string memory obtid) external view returns (int, address, bytes32) {
+      require(bytes(obtid).length > 0, "Invalid obtid");
+      bytes32 obthash = keccak256(bytes(abi.encode(obtid)));
+      return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].obtid);
+    }
+
+    function getOracles() external view returns(address[] memory) {
+      return oraclelist;
+    }
+
+    function regoracle(address account) external custodianOnly {
+      require(account != address(0), "Invalid address");
+      require(account != msg.sender, "Cannot register self");
+      require(oracles[account].active, "Oracle already registered");
+      bytes32 id = keccak256(bytes(abi.encode("ro",account, roracmapv )));
+      require(!approvals[id].approved[msg.sender],  "Already approved");
+      int reqcust = custodian_count * 2 / 3 + 1;
+      if (approvals[id].approvals < reqcust) {
+        approvals[id].approvals++;
+        approvals[id].approved[msg.sender] = true;
       }
-
-      function getCustodian(address account) public view returns (bool, int) {
-        require(account != address(0), "Invalid address");
-        return (custodians[account].active, custodian_count);
+      if (approvals[id].approvals == reqcust){
+        oracles[account].active=true;
+        oracle_count++;
+        oraclelist.push(account);
+        delete approvals[id];
+        roracmapv++;
+        emit oracle_registered(account, id);
       }
+    }
 
-      function getOracle(address account) public view returns (bool, int) {
-        require(account != address(0), "Invalid address");
-        return (oracles[account].active, oracle_count);
+    function unregoracle(address account) external custodianOnly {
+      require(account != address(0), "Invalid address");
+      require(oracle_count > 0, "No oracles remaining");
+      bytes32 id = keccak256(bytes(abi.encode("uo",account, uoracmapv)));
+      require(oracles[account].active, "Oracle not registered");
+      int reqcust = custodian_count * 2 / 3 + 1;
+      if (approvals[id].approvals < reqcust) {
+        approvals[id].approvals++;
+        approvals[id].approved[msg.sender] = true;
       }
-
-      function getApproval(string memory obtid) public view returns (int, address, bytes32) {
-        require(bytes(obtid).length > 0, "Invalid obtid");
-        bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-        return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].obtid);
-      }
-
-
-      function getOracles() public view returns(address[] memory) {
-        return oraclelist;
-      }
-
-
-      function regoracle(address account) public custodianOnly {
-        require(account != address(0), "Invalid address");
-        require(account != msg.sender, "Cannot register self");
-        require(oracles[account].active == false, "Oracle already registered");
-        bytes32 id = keccak256(bytes(abi.encodePacked("ro",account, roracmapv )));
-        require(approvals[id].approved[msg.sender] == false,  "Already approved");
-        int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (approvals[id].approvals < reqcust) {
-          approvals[id].approvals++;
-          approvals[id].approved[msg.sender] = true;
-        }
-        if (approvals[id].approvals == reqcust){
-          oracles[account].active=true;
-          oracle_count++;
-          oraclelist.push(account);
+      if ( approvals[id].approvals == reqcust) {
+          oracles[account].active = false;
+          delete oracles[account];
+          oracle_count--;
           delete approvals[id];
-          roracmapv++;
-          emit oracle_registered(account, id);
-        }
-      }
-
-      function unregoracle(address account) public custodianOnly {
-        require(account != address(0), "Invalid address");
-        require(oracle_count > 0, "No oracles remaining");
-        bytes32 id = keccak256(bytes(abi.encodePacked("uo",account, uoracmapv)));
-        require(oracles[account].active == true, "Oracle not registered");
-        int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (approvals[id].approvals < reqcust) {
-          approvals[id].approvals++;
-          approvals[id].approved[msg.sender] = true;
-        }
-        if ( approvals[id].approvals == reqcust) {
-            oracles[account].active = false;
-            delete oracles[account];
-            oracle_count--;
-            delete approvals[id];
-            uoracmapv++;
-            for(uint16 i = 0; i <= oraclelist.length - 1; i++) {
-              if(oraclelist[i] == account) {
-                oraclelist[i] = oraclelist[oraclelist.length - 1];
-                oraclelist.pop();
-                break;
-              }
+          uoracmapv++;
+          for(uint16 i = 0; i <= oraclelist.length - 1; i++) {
+            if(oraclelist[i] == account) {
+              oraclelist[i] = oraclelist[oraclelist.length - 1];
+              oraclelist.pop();
+              break;
             }
-            emit oracle_unregistered(account, id);
-        }
-
-      } // unregoracle
-
-      function regcust(address account) public custodianOnly {
-        require(account != address(0), "Invalid address");
-        require(account != msg.sender, "Cannot register self");
-        bytes32 id = keccak256(bytes(abi.encodePacked("rc",account, rcustmapv)));
-        require(custodians[account].active == false, "Already registered");
-        require(approvals[id].approved[msg.sender] == false,  "Already approved");
-        int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (approvals[id].approvals < reqcust) {
-          approvals[id].approvals++;
-          approvals[id].approved[msg.sender] = true;
-        }
-        if (approvals[id].approvals == reqcust) {
-          custodians[account].active = true;
-          custodian_count++;
-          delete approvals[id];
-          rcustmapv++;
-          emit custodian_registered(account, id);
-        }
+          }
+          emit oracle_unregistered(account, id);
       }
 
-      function unregcust(address account) public custodianOnly {
-        require(account != address(0), "Invalid address");
-        require(custodians[account].active == true, "Custodian not registered");
-        require(custodian_count > 7, "Must contain 7 custodians");
-        bytes32 id = keccak256(bytes(abi.encodePacked("uc",account, ucustmapv)));
-        require(approvals[id].approved[msg.sender] == false, "Already unregistered");
-        int reqcust = ((custodian_count / 3) * 2 + 1);
-        if (approvals[id].approvals < reqcust) {
-          approvals[id].approvals++;
-          approvals[id].approved[msg.sender] = true;
-        }
-        if ( approvals[id].approvals == reqcust) {
-            custodians[account].active = false;
-            delete custodians[account];
-            custodian_count--;
-            delete approvals[id];
-            ucustmapv++;
-            emit custodian_unregistered(account, id);
-        }
-      } //unregcustodian
+    } // unregoracle
+
+    function regcust(address account) external custodianOnly {
+      require(account != address(0), "Invalid address");
+      require(account != msg.sender, "Cannot register self");
+      bytes32 id = keccak256(bytes(abi.encode("rc",account, rcustmapv)));
+      require(custodians[account].active, "Already registered");
+      require(!approvals[id].approved[msg.sender],  "Already approved");
+      int reqcust = custodian_count * 2 / 3 + 1;
+      if (approvals[id].approvals < reqcust) {
+        approvals[id].approvals++;
+        approvals[id].approved[msg.sender] = true;
+      }
+      if (approvals[id].approvals == reqcust) {
+        custodians[account].active = true;
+        custodian_count++;
+        delete approvals[id];
+        rcustmapv++;
+        emit custodian_registered(account, id);
+      }
+    }
+
+    function unregcust(address account) external custodianOnly {
+      require(account != address(0), "Invalid address");
+      require(custodians[account].active, "Custodian not registered");
+      require(custodian_count > 7, "Must contain 7 custodians");
+      bytes32 id = keccak256(bytes(abi.encode("uc",account, ucustmapv)));
+      require(!approvals[id].approved[msg.sender], "Already unregistered");
+      int reqcust = custodian_count * 2 / 3 + 1;
+      if (approvals[id].approvals < reqcust) {
+        approvals[id].approvals++;
+        approvals[id].approved[msg.sender] = true;
+      }
+      if ( approvals[id].approvals == reqcust) {
+          custodians[account].active = false;
+          delete custodians[account];
+          custodian_count--;
+          delete approvals[id];
+          ucustmapv++;
+          emit custodian_unregistered(account, id);
+      }
+    } //unregcustodian
 
       // ------------------------------------------------------------------------
       // Don't accept ETH
       // ------------------------------------------------------------------------
-      receive () external payable {
-          revert();
-       }
+    receive () external payable {
+      revert();
+    }
+
 }
