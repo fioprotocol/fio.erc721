@@ -214,7 +214,7 @@ contract FIONFT is ERC721 {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
       bytes32 id = keccak256(bytes(abi.encode("rc",account, rcustmapv)));
-      require(custodians[account].active, "Already registered");
+      require(!custodians[account].active, "Already registered");
       require(!approvals[id].approved[msg.sender],  "Already approved");
       int reqcust = custodian_count * 2 / 3 + 1;
       if (approvals[id].approvals < reqcust) {
