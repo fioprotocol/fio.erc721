@@ -61,7 +61,7 @@ contract FIONFT is ERC721 {
         custodians[newcustodians[i]].active = true;
 
       }
-      _baseURIextended = "https://localhost:5443/";
+      _baseURIextended = "https://metadata.fioprotocol.io/domainnft?domain=";
       custodian_count = 10;
       oracle_count = 0;
     }
