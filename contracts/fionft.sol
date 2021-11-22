@@ -59,8 +59,9 @@ contract FIONFT is ERC721 {
       for (uint8 i = 0; i < 10; i++ ) {
         require(newcustodians[i] != owner, "Contract owner cannot be custodian");
         custodians[newcustodians[i]].active = true;
-        _baseURIextended = "https://localhost:5443/";
+
       }
+      _baseURIextended = "https://localhost:5443/";
       custodian_count = 10;
       oracle_count = 0;
     }
