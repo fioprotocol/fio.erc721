@@ -61,7 +61,7 @@ contract FIONFT is ERC721 {
         custodians[newcustodians[i]].active = true;
 
       }
-      _baseURIextended = "https://metadata.fioprotocol.io/domainnft?domain=";
+      _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
       oracle_count = 0;
     }
@@ -97,7 +97,7 @@ contract FIONFT is ERC721 {
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory){
       require(_exists(_tokenId), "No token");
-      return string(abi.encodePacked(_baseURI(), attribute[_tokenId]));
+      return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
     function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly returns (uint256){
