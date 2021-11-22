@@ -164,7 +164,7 @@ contract FIONFT is ERC721 {
     function regoracle(address account) external custodianOnly {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
-      require(oracles[account].active, "Oracle already registered");
+      require(!oracles[account].active, "Oracle already registered");
       bytes32 id = keccak256(bytes(abi.encode("ro",account, roracmapv )));
       require(!approvals[id].approved[msg.sender],  "Already approved");
       int reqcust = custodian_count * 2 / 3 + 1;
