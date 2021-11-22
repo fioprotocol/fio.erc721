@@ -97,7 +97,7 @@ contract FIONFT is ERC721 {
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory){
       require(_exists(_tokenId), "No token");
-      return string(abi.encodePacked(_baseURI(), "nfts/", attribute[_tokenId], ".json"));
+      return string(abi.encodePacked(_baseURI(), attribute[_tokenId]));
     }
 
     function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly returns (uint256){
