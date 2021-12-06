@@ -14,7 +14,6 @@ contract FIONFT is ERC721, ERC721Pausable {
     Counters.Counter private _tokenIds;
 
     address owner;
-    uint256 constant MINTABLE = 1e16;
 
     struct custodian {
       bool active;
@@ -62,8 +61,8 @@ contract FIONFT is ERC721, ERC721Pausable {
       for (uint8 i = 0; i < 10; i++ ) {
         require(newcustodians[i] != owner, "Contract owner cannot be custodian");
         custodians[newcustodians[i]].active = true;
-        _baseURIextended = "https://localhost:5443/";
       }
+      _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
       oracle_count = 0;
     }
@@ -112,7 +111,7 @@ contract FIONFT is ERC721, ERC721Pausable {
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory){
       require(_exists(_tokenId), "No token");
-      return string(abi.encodePacked(_baseURI(), "nfts/", attribute[_tokenId], ".json"));
+      return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
     function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
@@ -234,7 +233,7 @@ contract FIONFT is ERC721, ERC721Pausable {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
       bytes32 id = keccak256(bytes(abi.encode("rc",account, rcustmapv)));
-      require(custodians[account].active, "Already registered");
+      require(!custodians[account].active, "Already registered");
       require(!approvals[id].approved[msg.sender],  "Already approved");
       int reqcust = custodian_count * 2 / 3 + 1;
       if (approvals[id].approvals < reqcust) {
