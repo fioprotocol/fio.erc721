@@ -136,7 +136,7 @@ contract FIONFT is ERC721, ERC721Pausable {
         require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
       }
       if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[.exiomsg.sender], "Oracle must execute");
+       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
 
          _tokenIds.increment();
           tokenId = _tokenIds.current();
@@ -184,7 +184,7 @@ contract FIONFT is ERC721, ERC721Pausable {
     function regoracle(address account) external custodianOnly {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
-      require(oracles[account].active, "Oracle already registered");
+      require(!oracles[account].active, "Oracle already registered");
       bytes32 id = keccak256(bytes(abi.encode("ro",account, roracmapv )));
       require(!approvals[id].approved[msg.sender],  "Already approved");
       int reqcust = custodian_count * 2 / 3 + 1;
@@ -274,8 +274,8 @@ contract FIONFT is ERC721, ERC721Pausable {
       // ------------------------------------------------------------------------
       // Don't accept ETH
       // ------------------------------------------------------------------------
-    
-    
+
+
     receive () external payable {
       revert();
     }
