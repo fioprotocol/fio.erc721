@@ -1,9 +1,8 @@
 # FIO ADDRESS AND DOMAIN NFT - ERC721 Burnable Contract
 
-### Prerequisites
+### Prerequisites 
 - NPM 6.4.11
-- Truffle v5.4.7 (core: 5.4.7)
-- Solidity - >=0.8.0 (solc-js)
-- Node v16.6.1
-- Web3.js v1.5.2
+- Node 12.20.2
+- Truffle v5.1.65 (core: 5.1.65)
+- Solidity - ^0.8.0 (solc-js)
 - @OpenZeppelin/contracts@4.3.0
