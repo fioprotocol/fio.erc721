@@ -3,12 +3,13 @@
 // Adam Androulidakis 3/2021
 // Prototype: Do not use in production
 
-pragma solidity >=0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 
-contract FIONFT is ERC721 {
+contract FIONFT is ERC721, ERC721Pausable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
@@ -37,10 +38,12 @@ contract FIONFT is ERC721 {
     int rcustmapv;
     int ucustmapv;
 
+
     string _baseURIextended;
 
     event unwrapped(string fioaddress, string domain);
     event wrapped(address account, string domain, string obtid);
+    event domainburned(address account, uint256 tokenId, string obtid);
     event custodian_unregistered(address account, bytes32 eid);
     event custodian_registered(address account, bytes32 eid);
     event oracle_unregistered(address account, bytes32 eid);
@@ -59,7 +62,6 @@ contract FIONFT is ERC721 {
       for (uint8 i = 0; i < 10; i++ ) {
         require(newcustodians[i] != owner, "Contract owner cannot be custodian");
         custodians[newcustodians[i]].active = true;
-
       }
       _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
@@ -67,16 +69,21 @@ contract FIONFT is ERC721 {
     }
 
     modifier oracleOnly {
-      require(oracles[msg.sender].active,
-         "Only wFIO oracle can call action."
-      );
+
+      require(oracles[msg.sender].active, "Only FIONFT oracle can call action.");
+      //require(account != address(0), "Invalid account");
+      //require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
+      //require(bytes(obtid).length > 0, "Invalid obtid");
+      //require(oracle_count >= 3, "Oracles must be 3 or greater");
       _;
     }
 
     modifier custodianOnly {
-      require(custodians[msg.sender].active,
-         "Only wFIO custodian can call action."
-      );
+      require(custodians[msg.sender].active, "Only FIONFT custodian can call action.");
+      //require(account != address(0), "Invalid address");
+      //require(account != msg.sender, "Cannot register self");
+      //require(oracles[account].active, "Oracle already registered");
+      //require(!approvals[id].approved[msg.sender],  "Already approved");
       _;
     }
 
@@ -85,6 +92,14 @@ contract FIONFT is ERC721 {
           "Only contract owner can call action."
       );
       _;
+    }
+
+    function pause() external custodianOnly whenNotPaused{
+        _pause();
+    }
+
+    function unpause() external custodianOnly whenPaused{
+        _unpause();
     }
 
     function setBaseURI(string memory baseURI_) external custodianOnly()  {
@@ -100,7 +115,7 @@ contract FIONFT is ERC721 {
       return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
-    function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly returns (uint256){
+    function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
       require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
@@ -134,12 +149,46 @@ contract FIONFT is ERC721 {
         return tokenId;
     }
 
-    function unwrapnft(string memory fioaddress, uint256 tokenId) public {
+    function unwrapnft(string memory fioaddress, uint256 tokenId) external whenNotPaused {
       require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
       require(ownerOf(tokenId) == msg.sender);
       _burn(tokenId);
       emit unwrapped(fioaddress, attribute[tokenId]);
       attribute[tokenId] = "";
+    }
+
+    function burnnft(uint256 tokenId, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
+
+      require(_exists(tokenId), "Invalid tokenId");
+      require(bytes(obtid).length > 0, "Invalid obtid");
+      require(oracle_count >= 3, "Oracles must be 3 or greater");
+      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+      if (approvals[obthash].approvals < oracle_count) {
+        require(!approvals[obthash].approved[msg.sender], "Already approved");
+        approvals[obthash].approvals++;
+        approvals[obthash].approved[msg.sender] = true;
+      }
+      if (approvals[obthash].approvals == 1) {
+        approvals[obthash].account = msg.sender;
+        approvals[obthash].obtid = keccak256(bytes(obtid));
+      }
+      if (approvals[obthash].approvals > 1) {
+        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
+      }
+      if (approvals[obthash].approvals == oracle_count) {
+       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
+         _burn(tokenId);
+         attribute[tokenId] = "";
+         emit domainburned(msg.sender, tokenId, obtid);
+        delete approvals[obthash];
+      }
+
+        return tokenId;
+
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721, ERC721Pausable) {
+        super._beforeTokenTransfer(from, to, amount);
     }
 
     function getCustodian(address account) external view returns (bool, int) {
@@ -255,6 +304,8 @@ contract FIONFT is ERC721 {
       // ------------------------------------------------------------------------
       // Don't accept ETH
       // ------------------------------------------------------------------------
+
+
     receive () external payable {
       revert();
     }
