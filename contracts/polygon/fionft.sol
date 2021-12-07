@@ -43,6 +43,7 @@ contract FIONFT is ERC721, ERC721Pausable {
 
     event unwrapped(string fioaddress, string domain);
     event wrapped(address account, string domain, string obtid);
+    event domainburned(address account, uint256 tokenId, string obtid);
     event custodian_unregistered(address account, bytes32 eid);
     event custodian_registered(address account, bytes32 eid);
     event oracle_unregistered(address account, bytes32 eid);
@@ -154,6 +155,36 @@ contract FIONFT is ERC721, ERC721Pausable {
       _burn(tokenId);
       emit unwrapped(fioaddress, attribute[tokenId]);
       attribute[tokenId] = "";
+    }
+
+    function burnnft(uint256 tokenId, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
+
+      require(_exists(tokenId), "Invalid tokenId");
+      require(bytes(obtid).length > 0, "Invalid obtid");
+      require(oracle_count >= 3, "Oracles must be 3 or greater");
+      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+      if (approvals[obthash].approvals < oracle_count) {
+        require(!approvals[obthash].approved[msg.sender], "Already approved");
+        approvals[obthash].approvals++;
+        approvals[obthash].approved[msg.sender] = true;
+      }
+      if (approvals[obthash].approvals == 1) {
+        approvals[obthash].account = msg.sender;
+        approvals[obthash].obtid = keccak256(bytes(obtid));
+      }
+      if (approvals[obthash].approvals > 1) {
+        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
+      }
+      if (approvals[obthash].approvals == oracle_count) {
+       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
+         _burn(tokenId);
+         attribute[tokenId] = "";
+         emit domainburned(msg.sender, tokenId, obtid);
+        delete approvals[obthash];
+      }
+
+        return tokenId;
+
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721, ERC721Pausable) {
