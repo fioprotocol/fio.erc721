@@ -15,7 +15,7 @@ module.exports = {
   /**
   * contracts_directory tells Truffle where the contracts you want to compile are located
   */
-  contracts_directory: './contracts/polygon',
+  contracts_directory: './contracts/',
 
 
   networks: {
@@ -57,5 +57,5 @@ module.exports = {
         },
       }
     },
-  } 
+  }
 }
