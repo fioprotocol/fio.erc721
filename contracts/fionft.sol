@@ -53,7 +53,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
     mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
 
     function initialize( address[] memory newcustodians) initializer public {
-      __ERC721_init("FIONFT","FIONFT");
+      __ERC721_init("FIO Protocol NFT","FIO");
       __AccessControl_init();
       __Pausable_init();
       _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
