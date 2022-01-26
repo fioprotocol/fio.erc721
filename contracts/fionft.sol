@@ -186,6 +186,12 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       return (hasRole(CUSTODIAN_ROLE, account), custodian_count);
     }
 
+    function getOracle(address account) external view returns (bool, int) {
+      require(account != address(0), "Invalid address");
+      return (hasRole(ORACLE_ROLE, account), int(oraclelist.length));
+    }
+
+
     function getApproval(string memory obtid) external view returns (int, address, bytes32) {
       require(bytes(obtid).length > 0, "Invalid obtid");
       bytes32 obthash = keccak256(bytes(abi.encode(obtid)));
