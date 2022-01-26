@@ -1,17 +1,18 @@
+const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades');
 const FIONFT = artifacts.require("FIONFT");
 var Custodians =[
   '0xf74634D31E30b7f9f06e30dDb7Be729C2f136bb7',
-  '0xa800f4043E7f5E20a3Ab4b3648C261E47195106C',
-  '0x69868731b063802Bf7535d6F02DC24591eF72589',
-  '0x23BC1038dA6853541962840D62cff713C7ae2a75',
-  '0x8b15aE7c7f8Fa3EFC8c05e73411898d25F8bAE45',
-  '0xF8a201Ede1e6EC92fC0fb9DC9c213bA2A3980b59',
-  '0xCDF7392a0971cDb2c6C9963FB3e517040854171A',
-  '0x33ef7e8d065F029B8f6C48d3E6a50D49458d297d',
-  '0x07A422E28a395eEa0eE8e0f5A9b923F94cFA2110',
-  '0xbBD7AFc07e2e618a29D8769312f46a58e5388EcA'
+  '0x773171b2977059ffe47b2620bB52e2a5C456ed41',
+  '0xDd8D967974b451cF25116E673b987DCD407bc9fc',
+  '0x226172d1D968A975688Dcf72346ABBab93E97411',
+  '0xDFaA71cAfa2624c403cC8FC18cbC2f9139290fc2',
+  '0x61e3D238B0687b7c54F195776F91C2fDa452Fb66',
+  '0xDbe7FA5bDab52EEAFfd79c9f382E57fb641C10FF',
+  '0x4A66C0f2159989bfD7900658129d43019db9528D',
+  '0x3f8d7D92513084318Eca0736806fc316C208cA47',
+  '0x1e4a59E644C003FA8e3FdCE77ef9851fCBa2f0c6'
 ]
-module.exports = function (deployer) {
-  deployer.deploy(FIONFT, Custodians);
-
+module.exports = async function (deployer) {
+  const instance = await deployProxy(FIONFT, [Custodians], { deployer });
+  //const upgraded = await upgradeProxy(instance.address, FIONFT, {deployer});
 };
