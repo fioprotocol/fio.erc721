@@ -30,10 +30,10 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
     uint32 custodian_count;
     uint32 oracle_count;
 
-    int uoracmapv;
-    int roracmapv;
-    int rcustmapv;
-    int ucustmapv;
+    int private uoracmapv;
+    int private roracmapv;
+    int private rcustmapv;
+    int private ucustmapv;
 
     string _baseURIextended;
 
