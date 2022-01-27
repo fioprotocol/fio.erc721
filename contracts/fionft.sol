@@ -25,13 +25,12 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
 
     struct pending {
       mapping (address => bool) approved;
-      int approvals;
-      address account;
-      bytes32 obtid;
+      uint32 approvals;
+      bool complete;
     }
 
-    int custodian_count;
-    int oracle_count;
+    uint32 custodian_count;
+    uint32 oracle_count;
 
     int uoracmapv;
     int roracmapv;
@@ -60,6 +59,9 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       _grantRole(PAUSER_ROLE, msg.sender);
       _grantRole(MINTER_ROLE, msg.sender);
       _grantRole(OWNER_ROLE, msg.sender);
+      _grantRole(ORACLE_ROLE, newcustodians[1]);
+      _grantRole(ORACLE_ROLE, newcustodians[2]);
+      _grantRole(ORACLE_ROLE, newcustodians[3]);
       require(newcustodians.length == 10, "Cannot deploy");
       owner = msg.sender;
 
@@ -69,7 +71,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       }
       _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
-      oracle_count = 0;
+      oracle_count = 3;
     }
 
     function pause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenNotPaused{
@@ -93,6 +95,27 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
+    function getConsensus(bytes32 hash, uint8 t) internal onlyRole(ORACLE_ROLE) onlyRole(CUSTODIAN_ROLE) returns (bool){
+      require(!approvals[hash].approved[msg.sender], "Approval already complete");
+      uint32 APPROVALS_NEEDED;
+      if (t == 0) {
+        APPROVALS_NEEDED = custodian_count * 2 / 3 + 1;
+      } else {
+        APPROVALS_NEEDED = oracle_count;
+      }
+
+      if (approvals[hash].approvals < APPROVALS_NEEDED) {
+        require(!approvals[hash].approved[msg.sender], "oracle has already approved this hash");
+        approvals[hash].approved[msg.sender] = true;
+        approvals[hash].approvals++;
+        if (approvals[hash].approvals == APPROVALS_NEEDED) {
+          require(approvals[hash].approved[msg.sender], "An approving oracle must execute");
+          approvals[hash].complete = true;
+        }
+      }
+      return approvals[hash].complete;
+    }
+
     function wrapnft(address account, string memory domain, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
       require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
@@ -100,28 +123,12 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
       bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-      if (approvals[obthash].approvals < oracle_count) {
-        require(!approvals[obthash].approved[msg.sender], "Already approved");
-        approvals[obthash].approvals++;
-        approvals[obthash].approved[msg.sender] = true;
-      }
-      if (approvals[obthash].approvals == 1) {
-        approvals[obthash].account = account;
-        approvals[obthash].obtid = keccak256(bytes(obtid));
-      }
-      if (approvals[obthash].approvals > 1) {
-        require(approvals[obthash].account == account, "Account mismatch");
-        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
-      }
-      if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
-
+      if (getConsensus(obthash, 1)) {
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
          attribute[_tokenIds.current()] = domain;
          emit wrapped(account, domain, obtid);
-        delete approvals[obthash];
       }
 
         return tokenId;
@@ -141,24 +148,10 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-      if (approvals[obthash].approvals < oracle_count) {
-        require(!approvals[obthash].approved[msg.sender], "Already approved");
-        approvals[obthash].approvals++;
-        approvals[obthash].approved[msg.sender] = true;
-      }
-      if (approvals[obthash].approvals == 1) {
-        approvals[obthash].account = msg.sender;
-        approvals[obthash].obtid = keccak256(bytes(obtid));
-      }
-      if (approvals[obthash].approvals > 1) {
-        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
-      }
-      if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
+      if (getConsensus(obthash, 1)) {
          _burn(tokenId);
          attribute[tokenId] = "";
          emit domainburned(msg.sender, tokenId, obtid);
-        delete approvals[obthash];
       }
 
         return tokenId;
@@ -181,21 +174,20 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
     }
 
 
-    function getCustodian(address account) external view returns (bool, int) {
+    function getCustodian(address account) external view returns (bool, uint32) {
       require(account != address(0), "Invalid address");
       return (hasRole(CUSTODIAN_ROLE, account), custodian_count);
     }
 
-    function getOracle(address account) external view returns (bool, int) {
+    function getOracle(address account) external view returns (bool, uint32) {
       require(account != address(0), "Invalid address");
-      return (hasRole(ORACLE_ROLE, account), int(oraclelist.length));
+      return (hasRole(ORACLE_ROLE, account), uint32(oraclelist.length));
     }
 
-
-    function getApproval(string memory obtid) external view returns (int, address, bytes32) {
+    function getApproval(string memory obtid) external view returns (uint32, bool) {
       require(bytes(obtid).length > 0, "Invalid obtid");
       bytes32 obthash = keccak256(bytes(abi.encode(obtid)));
-      return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].obtid);
+      return (approvals[obthash].approvals, approvals[obthash].complete);
     }
 
     function getOracles() external view returns(address[] memory) {
@@ -207,17 +199,10 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(account != msg.sender, "Cannot register self");
       require(!hasRole(ORACLE_ROLE, account), "Oracle already registered");
       bytes32 id = keccak256(bytes(abi.encode("ro",account, roracmapv )));
-      require(!approvals[id].approved[msg.sender],  "Already approved");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if (approvals[id].approvals == reqcust){
+      if (getConsensus(id, 0)){
         _grantRole(ORACLE_ROLE, account);
         oracle_count++;
         oraclelist.push(account);
-        delete approvals[id];
         roracmapv++;
         emit oracle_registered(account, id);
       }
@@ -228,15 +213,9 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(oracle_count > 0, "No oracles remaining");
       bytes32 id = keccak256(bytes(abi.encode("uo",account, uoracmapv)));
       require(hasRole(ORACLE_ROLE, account), "Oracle not registered");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if ( approvals[id].approvals == reqcust) {
+      if ( getConsensus(id, 0)) {
           _revokeRole(ORACLE_ROLE, account);
           oracle_count--;
-          delete approvals[id];
           uoracmapv++;
           for(uint16 i = 0; i <= oraclelist.length - 1; i++) {
             if(oraclelist[i] == account) {
@@ -255,16 +234,9 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(account != msg.sender, "Cannot register self");
       bytes32 id = keccak256(bytes(abi.encode("rc",account, rcustmapv)));
       require(!hasRole(CUSTODIAN_ROLE, account), "Already registered");
-      require(!approvals[id].approved[msg.sender],  "Already approved");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if (approvals[id].approvals == reqcust) {
+      if (getConsensus(id, 0)) {
         _grantRole(CUSTODIAN_ROLE, account);
         custodian_count++;
-        delete approvals[id];
         rcustmapv++;
         emit custodian_registered(account, id);
       }
@@ -275,16 +247,10 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(hasRole(CUSTODIAN_ROLE, account), "Custodian not registered");
       require(custodian_count > 7, "Must contain 7 custodians");
       bytes32 id = keccak256(bytes(abi.encode("uc",account, ucustmapv)));
-      require(!approvals[id].approved[msg.sender], "Already unregistered");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if ( approvals[id].approvals == reqcust) {
+      require(hasRole(CUSTODIAN_ROLE, account), "Already unregistered");
+      if (getConsensus(id, 0)) {
           _revokeRole(CUSTODIAN_ROLE, account);
           custodian_count--;
-          delete approvals[id];
           ucustmapv++;
           emit custodian_unregistered(account, id);
       }
