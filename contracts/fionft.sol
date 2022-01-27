@@ -118,7 +118,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
-      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+      bytes32 obthash = keccak256(bytes(abi.encodePacked(account, domain, obtid)));
       if (getConsensus(obthash, 1)) {
          _tokenIds.increment();
           tokenId = _tokenIds.current();
@@ -143,7 +143,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(_exists(tokenId), "Invalid tokenId");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
-      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
+      bytes32 obthash = keccak256(bytes(abi.encodePacked(tokenId, obtid)));
       if (getConsensus(obthash, 1)) {
          _burn(tokenId);
          attribute[tokenId] = "";
