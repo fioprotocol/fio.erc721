@@ -21,8 +21,6 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant CUSTODIAN_ROLE = keccak256("CUSTODIAN_ROLE");
 
-    address owner;
-
     struct pending {
       mapping (address => bool) approved;
       uint32 approvals;
@@ -61,10 +59,10 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       _grantRole(OWNER_ROLE, msg.sender);
 
       require(newcustodians.length == 10, "Cannot deploy");
-      owner = msg.sender;
 
       for (uint8 i = 0; i < 10; i++ ) {
-        require(newcustodians[i] != owner, "Contract owner cannot be custodian");
+        require(!hasRole(CUSTODIAN_ROLE, newcustodians[i]), "Custodian already registered");
+        require(!hasRole(OWNER_ROLE, newcustodians[i]), "Owner role cannot be custodian");
         _grantRole(CUSTODIAN_ROLE, newcustodians[i]);
       }
       _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
