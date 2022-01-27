@@ -60,6 +60,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       _grantRole(PAUSER_ROLE, msg.sender);
       _grantRole(MINTER_ROLE, msg.sender);
       _grantRole(OWNER_ROLE, msg.sender);
+
       require(newcustodians.length == 10, "Cannot deploy");
       owner = msg.sender;
 
@@ -275,7 +276,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       require(hasRole(CUSTODIAN_ROLE, account), "Custodian not registered");
       require(custodian_count > 7, "Must contain 7 custodians");
       bytes32 id = keccak256(bytes(abi.encode("uc",account, ucustmapv)));
-      require(!approvals[id].approved[msg.sender], "Already unregistered");
+      require(!approvals[id].approved[msg.sender], "Already approved");
       int reqcust = custodian_count * 2 / 3 + 1;
       if (approvals[id].approvals < reqcust) {
         approvals[id].approvals++;
