@@ -69,7 +69,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       }
       _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
-      oracle_count = 3;
+      oracle_count = 0;
     }
 
     function pause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenNotPaused{
