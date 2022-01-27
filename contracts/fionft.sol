@@ -59,9 +59,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       _grantRole(PAUSER_ROLE, msg.sender);
       _grantRole(MINTER_ROLE, msg.sender);
       _grantRole(OWNER_ROLE, msg.sender);
-      _grantRole(ORACLE_ROLE, newcustodians[1]);
-      _grantRole(ORACLE_ROLE, newcustodians[2]);
-      _grantRole(ORACLE_ROLE, newcustodians[3]);
+
       require(newcustodians.length == 10, "Cannot deploy");
       owner = msg.sender;
 
@@ -95,7 +93,7 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
-    function getConsensus(bytes32 hash, uint8 t) internal onlyRole(ORACLE_ROLE) onlyRole(CUSTODIAN_ROLE) returns (bool){
+    function getConsensus(bytes32 hash, uint8 t) internal returns (bool){
       require(!approvals[hash].approved[msg.sender], "Approval already complete");
       uint32 APPROVALS_NEEDED;
       if (t == 0) {
