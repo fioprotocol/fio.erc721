@@ -70,11 +70,11 @@ contract FIONFT is ERC721Upgradeable, AccessControlUpgradeable, PausableUpgradea
       oracle_count = 0;
     }
 
-    function pause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenNotPaused{
+    function pause() external onlyRole(CUSTODIAN_ROLE) whenNotPaused{
         _pause();
     }
 
-    function unpause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenPaused{
+    function unpause() external onlyRole(CUSTODIAN_ROLE) whenPaused{
         _unpause();
     }
 

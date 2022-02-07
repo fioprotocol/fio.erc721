@@ -7,12 +7,11 @@ require("chai")
   .should();
 
 contract("FIONFT", (address) => {
-
     let fionft;
+    
+    before(async function(){
+        fionft = await FIONFT.deployed();
 
-    before(async function() {
-        fionft = await FIONFT.deployed()
-        //console.log(fionft); //will show all deployment inforamtion
         ;});
 
         describe("Deployment", async () => {
@@ -70,12 +69,12 @@ contract("FIONFT", (address) => {
                         
                     }
 
-                }while (number < 10);
+                }while (number < 9);
 
             });
 
         });
-
+        
         describe("Oracles", async () =>{
                         
             it("registers by non custodian", async () => {
@@ -87,7 +86,7 @@ contract("FIONFT", (address) => {
 
                 } catch (error) {
                 
-                    console.dir("Failed - Non Custodian cannot register oracle");
+                    console.log("Sucess - Non Custodian cannot register oracle");
 
                 }   
 
@@ -109,13 +108,13 @@ contract("FIONFT", (address) => {
                     } catch (error) {
                 
                         console.log(error);
-
+                        number++; 
                     } 
 
                 }while (number != 9)
                                          
             });
-
+            
             it("Register Oracle 2", async () => {
 
                 var number = 1;
@@ -136,7 +135,7 @@ contract("FIONFT", (address) => {
                     } catch (error) {
                 
                         console.log(error);
-
+                        number++; 
                     } 
 
                 }while (number < 9)
@@ -163,7 +162,7 @@ contract("FIONFT", (address) => {
                     } catch (error) {
                 
                         console.log(error);
-    
+                        number++; 
                     } 
 
                 }while (number < 9)
@@ -184,7 +183,7 @@ contract("FIONFT", (address) => {
                 }
 
             });
-
+            
             it("view oracles", async () => {
             
                 try{
@@ -203,9 +202,9 @@ contract("FIONFT", (address) => {
                 }
 
             });
-
+            
         });
-
+        
         describe("Checks Oracles and Custodians", async() => {
 
             it("checks oracle count", async () => {
@@ -239,7 +238,7 @@ contract("FIONFT", (address) => {
                     } catch (error) {
                 
                     console.log(error);
-
+                    number++;     
                     } 
                 }while (number < 10);
 
@@ -263,7 +262,7 @@ contract("FIONFT", (address) => {
 
                 try{
 
-                    const ac1 = await fionft.wrapnft(address[5], "amazon", "0x123456789", {from: address[1]});
+                    const ac1 = await fionft.wrapnft(address[5], "1000", "amazon", {from: address[1]});
                     // console.log(ac1); //for tracking if needed
 
                 } catch (error){
@@ -289,7 +288,7 @@ contract("FIONFT", (address) => {
 
             })
             
-
+            
         });
 
         describe("Wrap", async() =>{
