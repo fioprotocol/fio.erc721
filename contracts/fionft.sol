@@ -315,17 +315,17 @@ contract FIONFT is ERC721, ERC721Pausable {
       revert();
     }
 
-    function listDomainsOfOwner(address _owner) public view returns(uint256[] memory ownerTokens) {
+    function listDomainsOfOwner(address _owner) public view returns(string[] memory ownerTokens) {
         uint256 tokenCount = balanceOf(_owner);
         if (tokenCount == 0) {
-         return new uint256[](0);
+         return new string[](0);
         } else {
-          uint256[] memory result = new uint256[](tokenCount);
+          string[] memory result = new string[](tokenCount);
           uint256 resultIndex = 0;
           uint256 tokenId;
           for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
             if (_owners[tokenId] == _owner) {
-                result[resultIndex] = tokenId;
+                result[resultIndex] = attribute[tokenId];
                 resultIndex++;
             }
           }
