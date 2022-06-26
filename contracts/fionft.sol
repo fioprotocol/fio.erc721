@@ -53,6 +53,8 @@ contract FIONFT is ERC721, ERC721Pausable {
     address[] oraclelist;
     mapping ( address => custodian ) custodians;
     mapping ( uint256 => string ) attribute;
+    // Mapping from token ID to owner address
+    mapping(uint256 => address) private _owners;
     mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
 
     constructor( address[] memory newcustodians) ERC721("FIO Protocol NFT", "FIO") {
@@ -143,6 +145,7 @@ contract FIONFT is ERC721, ERC721Pausable {
          _mint(account, tokenId);
          attribute[_tokenIds.current()] = domain;
          emit wrapped(account, domain, obtid);
+         _owners[tokenId] = account;
         delete approvals[obthash];
       }
 
@@ -155,6 +158,7 @@ contract FIONFT is ERC721, ERC721Pausable {
       _burn(tokenId);
       emit unwrapped(fioaddress, attribute[tokenId]);
       attribute[tokenId] = "";
+      _owners[tokenId] = address(0);
     }
 
     function burnnft(uint256 tokenId, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
@@ -180,6 +184,7 @@ contract FIONFT is ERC721, ERC721Pausable {
          _burn(tokenId);
          attribute[tokenId] = "";
          emit domainburned(msg.sender, tokenId, obtid);
+         _owners[tokenId] = address(0);
         delete approvals[obthash];
       }
 
@@ -308,6 +313,24 @@ contract FIONFT is ERC721, ERC721Pausable {
 
     receive () external payable {
       revert();
+    }
+
+    function listDomainsOfOwner(address _owner) public view returns(uint256[] memory ownerTokens) {
+        uint256 tokenCount = balanceOf(_owner);
+        if (tokenCount == 0) {
+         return new uint256[](0);
+        } else {
+          uint256[] memory result = new uint256[](tokenCount);
+          uint256 resultIndex = 0;
+          uint256 tokenId;
+          for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
+            if (_owners[tokenId] == _owner) {
+                result[resultIndex] = tokenId;
+                resultIndex++;
+            }
+          }
+         return result;
+      }
     }
 
 }
