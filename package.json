@@ -13,9 +13,9 @@
     "start-network": "npx ganache-cli"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.3.0",
+    "@openzeppelin/contracts": "^4.7.0",
     "@truffle/hdwallet-provider": "^1.7.0",
     "dotenv": "^10.0.0",
-    "solc": "^0.8.0"
+    "solc": "^0.8.7"
   }
 }
