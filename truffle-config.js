@@ -4,6 +4,7 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 require('dotenv').config();
 const mnemonic = process.env["MNEMONIC"];
 const appid = process.env["APP_ID"];
+const apikey = process.env["POLYGONSCAN_API_KEY"];
 
 module.exports = {
 
@@ -17,7 +18,6 @@ module.exports = {
   */
   contracts_directory: './contracts/',
 
-
   networks: {
     development: {
       host: "127.0.0.1",     // Localhost (default: none)
@@ -25,14 +25,8 @@ module.exports = {
       network_id: "*",       // Any network (default: none)
     },
     //polygon matic testnet
-    matic_mumbai_testnet: {
-      provider: () => new HDWalletProvider({
-        mnemonic: {
-          phrase: mnemonic
-        },
-        providerOrUrl:
-         "https://rpc-mumbai.maticvigil.com/v1/" + appid
-      }),
+    mumbai_testnet: {
+      provider: () => new HDWalletProvider(mnemonic, "https://polygon-mumbai.infura.io/v3/" + appid),
       network_id: 80001,
       confirmations: 2,
       timeoutBlocks: 200,
@@ -53,9 +47,24 @@ module.exports = {
       settings: {          // See the solidity docs for advice about optimization and evmVersion
         optimizer: {
         enabled: true,
-        runs: 100
+        runs: 200
         },
       }
     },
-  }
+  },
+
+  // Truffle DB is enabled in this project by default. Enabling Truffle DB surfaces access to the @truffle/db package
+  // for querying data about the contracts, deployments, and networks in this project
+  db: {
+    enabled: true
+  },
+
+  // Used to automatically verifiy the contract on etherscan
+  api_keys: {
+    polygonscan: apikey,
+  },
+  plugins: [
+    'truffle-plugin-verify'
+  ],
+
 }
