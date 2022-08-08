@@ -116,25 +116,6 @@ contract FIONFT is ERC721, Pausable, AccessControl {
       return approvals[hash].complete;
     }
 
-    function reset_consensus(bytes32 hash, uint8 approvalType) internal {
-        if (approvalType == 0) {
-
-            for (uint i = 0; i < oracle_count; i++) {
-                delete approvals[hash].approved[oraclelist[i]];
-            }
-            
-        } else {
-
-            for (uint i = 0; i < custodian_count; i++) {
-                delete approvals[hash].approved[custodianlist[i]];
-            }
-
-        }
-
-        delete approvals[hash];
-
-    }
-
     function wrapnft(address account, string memory domain, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
       require(account != address(this), "No wrapping to contract account");
