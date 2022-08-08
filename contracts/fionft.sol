@@ -7,37 +7,35 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract FIONFT is ERC721, ERC721Pausable {
+contract FIONFT is ERC721, Pausable, AccessControl {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    address owner;
-
-    struct custodian {
-      bool active;
-    }
-
-    struct oracle {
-      bool active;
-    }
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+    bytes32 public constant CUSTODIAN_ROLE = keccak256("CUSTODIAN_ROLE");
 
     struct pending {
       mapping (address => bool) approved;
-      int approvals;
-      address account;
-      bytes32 obtid;
+      bool complete;
+      uint32 approvals;
     }
 
-    int custodian_count;
-    int oracle_count;
+    uint32 custodian_count;
+    uint32 oracle_count;
 
-    int uoracmapv;
-    int roracmapv;
-    int rcustmapv;
-    int ucustmapv;
-
+    enum ApprovalType {
+        WrapNFT,
+        BurnNFT,
+        AddOracle,
+        RemoveOracle,
+        AddCustodian,
+        RemoveCustodian
+    }
 
     string _baseURIextended;
 
@@ -48,63 +46,42 @@ contract FIONFT is ERC721, ERC721Pausable {
     event custodian_registered(address account, bytes32 eid);
     event oracle_unregistered(address account, bytes32 eid);
     event oracle_registered(address account, bytes32 eid);
+    event consensus_activity(string signer, bytes32 hash);
 
-    mapping ( address => oracle) oracles;
-    address[] oraclelist;
-    mapping ( address => custodian ) custodians;
+    address[] public oraclelist;
+    address[] private custodianlist;
+
     mapping ( uint256 => string ) attribute;
-    // Mapping from token ID to owner address
-    mapping(uint256 => address) private _owners;
     mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
+    mapping(uint256 => address) private _owners;
 
-    constructor( address[] memory newcustodians) ERC721("FIO Protocol NFT", "FIO") {
-            require(newcustodians.length == 10, "Cannot deploy");
-      owner = msg.sender;
+    constructor( address[] memory newcustodians)  ERC721("FIO Protocol NFT", "FIO") {
+
+      _grantRole(PAUSER_ROLE, msg.sender);
+      _grantRole(OWNER_ROLE, msg.sender);
+
+      require(newcustodians.length == 10, "Cannot deploy");
 
       for (uint8 i = 0; i < 10; i++ ) {
-        require(newcustodians[i] != owner, "Contract owner cannot be custodian");
-        custodians[newcustodians[i]].active = true;
+        require(!hasRole(CUSTODIAN_ROLE, newcustodians[i]), "Custodian already registered");
+        require(!hasRole(OWNER_ROLE, newcustodians[i]), "Owner role cannot be custodian");
+        _grantRole(CUSTODIAN_ROLE, newcustodians[i]);
+        custodianlist.push(newcustodians[i]);
       }
       _baseURIextended = "https://metadata.fioprotocol.io/domainnft/";
       custodian_count = 10;
       oracle_count = 0;
     }
 
-    modifier oracleOnly {
-
-      require(oracles[msg.sender].active, "Only FIONFT oracle can call action.");
-      //require(account != address(0), "Invalid account");
-      //require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
-      //require(bytes(obtid).length > 0, "Invalid obtid");
-      //require(oracle_count >= 3, "Oracles must be 3 or greater");
-      _;
-    }
-
-    modifier custodianOnly {
-      require(custodians[msg.sender].active, "Only FIONFT custodian can call action.");
-      //require(account != address(0), "Invalid address");
-      //require(account != msg.sender, "Cannot register self");
-      //require(oracles[account].active, "Oracle already registered");
-      //require(!approvals[id].approved[msg.sender],  "Already approved");
-      _;
-    }
-
-    modifier ownerOnly {
-      require( msg.sender == owner,
-          "Only contract owner can call action."
-      );
-      _;
-    }
-
-    function pause() external custodianOnly whenNotPaused{
+    function pause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenNotPaused{
         _pause();
     }
 
-    function unpause() external custodianOnly whenPaused{
+    function unpause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenPaused{
         _unpause();
     }
 
-    function setBaseURI(string memory baseURI_) external custodianOnly()  {
+    function setBaseURI(string memory baseURI_) external onlyRole(CUSTODIAN_ROLE)  {
         _baseURIextended = baseURI_;
     }
 
@@ -117,38 +94,64 @@ contract FIONFT is ERC721, ERC721Pausable {
       return string(abi.encodePacked(_baseURI(), attribute[_tokenId], ".json"));
     }
 
-    function wrapnft(address account, string memory domain, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
+    //Precondition: Roles must be checked in parent functions. This should only be called by authorized oracle or custodian
+    function getConsensus(bytes32 hash, uint8 approvalType) internal returns (bool){
+      require(!approvals[hash].complete, "Approval already complete");
+
+      uint32 APPROVALS_NEEDED = oracle_count;
+      if (approvalType == 1) {
+        APPROVALS_NEEDED = custodian_count * 2 / 3 + 1;
+      }
+      if (approvals[hash].approvals < APPROVALS_NEEDED) {
+        require(!approvals[hash].approved[msg.sender], "oracle has already approved this hash");
+        approvals[hash].approved[msg.sender] = true;
+        approvals[hash].approvals++;
+         //moving this if block after the parent if block will allow the execution to take place immediately instead of requiring a subsequent call 
+        if (approvals[hash].approvals >= APPROVALS_NEEDED) {
+          require(approvals[hash].approved[msg.sender], "An approving oracle must execute");
+          approvals[hash].complete = true;
+          return approvals[hash].complete;
+        }
+      }
+      return approvals[hash].complete;
+    }
+
+    function reset_consensus(bytes32 hash, uint8 approvalType) internal {
+        if (approvalType == 0) {
+
+            for (uint i = 0; i < oracle_count; i++) {
+                delete approvals[hash].approved[oraclelist[i]];
+            }
+            
+        } else {
+
+            for (uint i = 0; i < custodian_count; i++) {
+                delete approvals[hash].approved[custodianlist[i]];
+            }
+
+        }
+
+        delete approvals[hash];
+
+    }
+
+    function wrapnft(address account, string memory domain, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
+      require(account != address(this), "No wrapping to contract account");
       require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
-      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-      if (approvals[obthash].approvals < oracle_count) {
-        require(!approvals[obthash].approved[msg.sender], "Already approved");
-        approvals[obthash].approvals++;
-        approvals[obthash].approved[msg.sender] = true;
-      }
-      if (approvals[obthash].approvals == 1) {
-        approvals[obthash].account = account;
-        approvals[obthash].obtid = keccak256(bytes(obtid));
-      }
-      if (approvals[obthash].approvals > 1) {
-        require(approvals[obthash].account == account, "Account mismatch");
-        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
-      }
-      if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
-
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.WrapNFT, account, domain, obtid)));
+      if (getConsensus(indexhash, 0)) {
          _tokenIds.increment();
           tokenId = _tokenIds.current();
          _mint(account, tokenId);
          attribute[_tokenIds.current()] = domain;
          emit wrapped(account, domain, obtid);
-         _owners[tokenId] = account;
-        delete approvals[obthash];
+        _owners[tokenId] = account;
       }
-
+        emit consensus_activity("oracle", indexhash);
         return tokenId;
     }
 
@@ -161,149 +164,146 @@ contract FIONFT is ERC721, ERC721Pausable {
       _owners[tokenId] = address(0);
     }
 
-    function burnnft(uint256 tokenId, string memory obtid) external oracleOnly whenNotPaused returns (uint256){
+    function burnnft(uint256 tokenId, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
 
       require(_exists(tokenId), "Invalid tokenId");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
-      bytes32 obthash = keccak256(bytes(abi.encodePacked(obtid)));
-      if (approvals[obthash].approvals < oracle_count) {
-        require(!approvals[obthash].approved[msg.sender], "Already approved");
-        approvals[obthash].approvals++;
-        approvals[obthash].approved[msg.sender] = true;
-      }
-      if (approvals[obthash].approvals == 1) {
-        approvals[obthash].account = msg.sender;
-        approvals[obthash].obtid = keccak256(bytes(obtid));
-      }
-      if (approvals[obthash].approvals > 1) {
-        require(approvals[obthash].obtid == keccak256(bytes(obtid)), "Obtid mismatch");
-      }
-      if (approvals[obthash].approvals == oracle_count) {
-       require(approvals[obthash].approved[msg.sender], "Oracle must execute");
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.BurnNFT, tokenId, obtid)));
+      if (getConsensus(indexhash, 0)) {
          _burn(tokenId);
          attribute[tokenId] = "";
          emit domainburned(msg.sender, tokenId, obtid);
-         _owners[tokenId] = address(0);
-        delete approvals[obthash];
+        _owners[tokenId] = address(0);
       }
 
+        emit consensus_activity("custodian", indexhash);
         return tokenId;
 
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721, ERC721Pausable) {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721) {
+        require(to != address(this), "Cannot transfer to contract");
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function getCustodian(address account) external view returns (bool, int) {
-      require(account != address(0), "Invalid address");
-      return (custodians[account].active, custodian_count);
+    // The following functions are overrides required by Solidity.
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, AccessControl)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 
-    function getOracle(address account) external view returns (bool, int) {
+
+    function getCustodian(address account) external view returns (bool, uint32) {
       require(account != address(0), "Invalid address");
-      return (oracles[account].active, oracle_count);
+      return (hasRole(CUSTODIAN_ROLE, account), custodian_count);
     }
 
-    function getApproval(string memory obtid) external view returns (int, address, bytes32) {
-      require(bytes(obtid).length > 0, "Invalid obtid");
-      bytes32 obthash = keccak256(bytes(abi.encode(obtid)));
-      return (approvals[obthash].approvals, approvals[obthash].account, approvals[obthash].obtid);
+    function getOracle(address account) external view returns (bool, uint32) {
+      require(account != address(0), "Invalid address");
+      return (hasRole(ORACLE_ROLE, account), uint32(oraclelist.length));
+    }
+
+    function getApproval(bytes memory obtid) external view returns (uint32, bool) {
+      require(obtid.length > 0, "Invalid obtid");
+      return (approvals[bytes32(obtid)].approvals, approvals[bytes32(obtid)].complete);
+    }
+
+    function listDomainsOfOwner(address _owner) public view returns(string[] memory ownerTokens) {
+    uint256 tokenCount = balanceOf(_owner);
+    if (tokenCount == 0) {
+        return new string[](0);
+    } else {
+        string[] memory result = new string[](tokenCount);
+        uint256 resultIndex = 0;
+        uint256 tokenId;
+        for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
+            if (_owners[tokenId] == _owner) {
+                result[resultIndex] = attribute[tokenId];
+                resultIndex++;
+            }
+        }
+            return result;
+        }
     }
 
     function getOracles() external view returns(address[] memory) {
       return oraclelist;
     }
 
-    function regoracle(address account) external custodianOnly {
+    function regoracle(address account) external onlyRole(CUSTODIAN_ROLE)  {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
-      require(!oracles[account].active, "Oracle already registered");
-      bytes32 id = keccak256(bytes(abi.encode("ro",account, roracmapv )));
-      require(!approvals[id].approved[msg.sender],  "Already approved");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if (approvals[id].approvals == reqcust){
-        oracles[account].active=true;
+      require(!hasRole(ORACLE_ROLE, account), "Oracle already registered");
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.AddOracle,account )));
+      if (getConsensus(indexhash, 1)){
+        _grantRole(ORACLE_ROLE, account);
         oracle_count++;
         oraclelist.push(account);
-        delete approvals[id];
-        roracmapv++;
-        emit oracle_registered(account, id);
+        emit oracle_registered(account, indexhash);
       }
+      emit consensus_activity("custodian", indexhash);
     }
 
-    function unregoracle(address account) external custodianOnly {
+    function unregoracle(address account) external onlyRole(CUSTODIAN_ROLE) {
       require(account != address(0), "Invalid address");
       require(oracle_count > 0, "No oracles remaining");
-      bytes32 id = keccak256(bytes(abi.encode("uo",account, uoracmapv)));
-      require(oracles[account].active, "Oracle not registered");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if ( approvals[id].approvals == reqcust) {
-          oracles[account].active = false;
-          delete oracles[account];
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveOracle,account)));
+      require(hasRole(ORACLE_ROLE, account), "Oracle not registered");
+      if ( getConsensus(indexhash, 1)) {
+          _revokeRole(ORACLE_ROLE, account);
           oracle_count--;
-          delete approvals[id];
-          uoracmapv++;
-          for(uint16 i = 0; i <= oraclelist.length - 1; i++) {
+          for(uint16 i = 0; i < oraclelist.length; i++) {
             if(oraclelist[i] == account) {
               oraclelist[i] = oraclelist[oraclelist.length - 1];
               oraclelist.pop();
               break;
             }
           }
-          emit oracle_unregistered(account, id);
+          emit oracle_unregistered(account, indexhash);
       }
+       emit consensus_activity("custodian", indexhash);
 
     } // unregoracle
 
-    function regcust(address account) external custodianOnly {
+    function regcust(address account) external onlyRole(CUSTODIAN_ROLE) {
       require(account != address(0), "Invalid address");
       require(account != msg.sender, "Cannot register self");
-      bytes32 id = keccak256(bytes(abi.encode("rc",account, rcustmapv)));
-      require(!custodians[account].active, "Already registered");
-      require(!approvals[id].approved[msg.sender],  "Already approved");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if (approvals[id].approvals == reqcust) {
-        custodians[account].active = true;
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.AddCustodian,account)));
+      require(!hasRole(CUSTODIAN_ROLE, account), "Already registered");
+      if (getConsensus(indexhash, 1)) {
+        _grantRole(CUSTODIAN_ROLE, account);
         custodian_count++;
-        delete approvals[id];
-        rcustmapv++;
-        emit custodian_registered(account, id);
+        custodianlist.push(account);
+        emit custodian_registered(account, indexhash);
       }
+      emit consensus_activity("custodian", indexhash);
     }
 
-    function unregcust(address account) external custodianOnly {
+    function unregcust(address account) external onlyRole(CUSTODIAN_ROLE) {
       require(account != address(0), "Invalid address");
-      require(custodians[account].active, "Custodian not registered");
+      require(hasRole(CUSTODIAN_ROLE, account), "Custodian not registered");
       require(custodian_count > 7, "Must contain 7 custodians");
-      bytes32 id = keccak256(bytes(abi.encode("uc",account, ucustmapv)));
-      require(!approvals[id].approved[msg.sender], "Already unregistered");
-      int reqcust = custodian_count * 2 / 3 + 1;
-      if (approvals[id].approvals < reqcust) {
-        approvals[id].approvals++;
-        approvals[id].approved[msg.sender] = true;
-      }
-      if ( approvals[id].approvals == reqcust) {
-          custodians[account].active = false;
-          delete custodians[account];
+      bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveCustodian,account)));
+      require(hasRole(CUSTODIAN_ROLE, account), "Already unregistered");
+      if (getConsensus(indexhash, 1)) {
+          _revokeRole(CUSTODIAN_ROLE, account);
           custodian_count--;
-          delete approvals[id];
-          ucustmapv++;
-          emit custodian_unregistered(account, id);
+          for(uint16 i = 0; i < custodianlist.length; i++) {
+            if(custodianlist[i] == account) {
+              custodianlist[i] = custodianlist[custodianlist.length - 1];
+              custodianlist.pop();
+              break;
+            }
+          }
+          emit custodian_unregistered(account, indexhash);
       }
+      emit consensus_activity("custodian", indexhash);
     } //unregcustodian
 
       // ------------------------------------------------------------------------
@@ -313,24 +313,6 @@ contract FIONFT is ERC721, ERC721Pausable {
 
     receive () external payable {
       revert();
-    }
-
-    function listDomainsOfOwner(address _owner) public view returns(string[] memory ownerTokens) {
-        uint256 tokenCount = balanceOf(_owner);
-        if (tokenCount == 0) {
-         return new string[](0);
-        } else {
-          string[] memory result = new string[](tokenCount);
-          uint256 resultIndex = 0;
-          uint256 tokenId;
-          for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
-            if (_owners[tokenId] == _owner) {
-                result[resultIndex] = attribute[tokenId];
-                resultIndex++;
-            }
-          }
-         return result;
-      }
     }
 
 }
