@@ -103,12 +103,12 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         APPROVALS_NEEDED = custodian_count * 2 / 3 + 1;
       }
       if (approvals[hash].approvals < APPROVALS_NEEDED) {
-        require(!approvals[hash].approved[msg.sender], "oracle has already approved this hash");
+        require(!approvals[hash].approved[msg.sender], "sender has already approved this hash");
         approvals[hash].approved[msg.sender] = true;
         approvals[hash].approvals++;
          //moving this if block after the parent if block will allow the execution to take place immediately instead of requiring a subsequent call 
         if (approvals[hash].approvals >= APPROVALS_NEEDED) {
-          require(approvals[hash].approved[msg.sender], "An approving oracle must execute");
+          require(approvals[hash].approved[msg.sender], "An approver must execute");
           approvals[hash].complete = true;
           return approvals[hash].complete;
         }
@@ -118,7 +118,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
 
     function wrapnft(address account, string memory domain, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
-      require(account != address(this), "No wrapping to contract account");
+      require(account != address(this), "Cannot wrap to contract account");
       require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
@@ -137,8 +137,8 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     function unwrapnft(string memory fioaddress, uint256 tokenId) external whenNotPaused {
-      require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Address");
-      require(ownerOf(tokenId) == msg.sender);
+      require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Handle");
+      require(ownerOf(tokenId) == msg.sender, "Invalid token owner");
       _burn(tokenId);
       emit unwrapped(fioaddress, attribute[tokenId]);
       attribute[tokenId] = "";
@@ -181,12 +181,12 @@ contract FIONFT is ERC721, Pausable, AccessControl {
 
 
     function getCustodian(address account) external view returns (bool, uint32) {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       return (hasRole(CUSTODIAN_ROLE, account), custodian_count);
     }
 
     function getOracle(address account) external view returns (bool, uint32) {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       return (hasRole(ORACLE_ROLE, account), uint32(oraclelist.length));
     }
 
@@ -218,9 +218,9 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     function regoracle(address account) external onlyRole(CUSTODIAN_ROLE)  {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       require(account != msg.sender, "Cannot register self");
-      require(!hasRole(ORACLE_ROLE, account), "Oracle already registered");
+      require(!hasRole(ORACLE_ROLE, account), "Already registered");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.AddOracle,account )));
       if (getConsensus(indexhash, 1)){
         _grantRole(ORACLE_ROLE, account);
@@ -232,7 +232,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     function unregoracle(address account) external onlyRole(CUSTODIAN_ROLE) {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       require(oracle_count > 0, "No oracles remaining");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveOracle,account)));
       require(hasRole(ORACLE_ROLE, account), "Oracle not registered");
@@ -253,7 +253,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     } // unregoracle
 
     function regcust(address account) external onlyRole(CUSTODIAN_ROLE) {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       require(account != msg.sender, "Cannot register self");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.AddCustodian,account)));
       require(!hasRole(CUSTODIAN_ROLE, account), "Already registered");
@@ -267,11 +267,10 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     function unregcust(address account) external onlyRole(CUSTODIAN_ROLE) {
-      require(account != address(0), "Invalid address");
+      require(account != address(0), "Invalid account");
       require(hasRole(CUSTODIAN_ROLE, account), "Custodian not registered");
-      require(custodian_count > 7, "Must contain 7 custodians");
+      require(custodian_count >= 7, "Must contain 7 custodians");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveCustodian,account)));
-      require(hasRole(CUSTODIAN_ROLE, account), "Already unregistered");
       if (getConsensus(indexhash, 1)) {
           _revokeRole(CUSTODIAN_ROLE, account);
           custodian_count--;
