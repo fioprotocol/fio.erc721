@@ -95,11 +95,11 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     //Precondition: Roles must be checked in parent functions. This should only be called by authorized oracle or custodian
-    function getConsensus(bytes32 hash, uint8 approvalType) internal returns (bool){
+    function getConsensus(bytes32 hash, uint8 Type) internal returns (bool){
       require(!approvals[hash].complete, "Approval already complete");
 
       uint32 APPROVALS_NEEDED = oracle_count;
-      if (approvalType == 1) {
+      if (Type == 1) {
         APPROVALS_NEEDED = custodian_count * 2 / 3 + 1;
       }
       if (approvals[hash].approvals < APPROVALS_NEEDED) {
