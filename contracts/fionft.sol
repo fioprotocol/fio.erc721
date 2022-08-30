@@ -119,7 +119,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     function wrapnft(address account, string memory domain, string memory obtid) external onlyRole(ORACLE_ROLE) whenNotPaused returns (uint256){
       require(account != address(0), "Invalid account");
       require(account != address(this), "Cannot wrap to contract account");
-      require(bytes(domain).length > 1 && bytes(domain).length < 64, "Invalid domain");
+      require(bytes(domain).length >= 1 && bytes(domain).length < 63, "Invalid domain");
       require(bytes(obtid).length > 0, "Invalid obtid");
       require(oracle_count >= 3, "Oracles must be 3 or greater");
       uint256 tokenId = 0;
@@ -137,7 +137,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     }
 
     function unwrapnft(string memory fioaddress, uint256 tokenId) external whenNotPaused {
-      require(bytes(fioaddress).length > 3 && bytes(fioaddress).length <= 64, "Invalid FIO Handle");
+      require(bytes(fioaddress).length >=3 && bytes(fioaddress).length <= 64, "Invalid FIO Handle");
       require(ownerOf(tokenId) == msg.sender, "Invalid token owner");
       _burn(tokenId);
       emit unwrapped(fioaddress, attribute[tokenId]);
@@ -158,7 +158,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         _owners[tokenId] = address(0);
       }
 
-        emit consensus_activity("custodian", indexhash);
+        emit consensus_activity("oracle", indexhash);
         return tokenId;
 
     }
@@ -269,7 +269,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     function unregcust(address account) external onlyRole(CUSTODIAN_ROLE) {
       require(account != address(0), "Invalid account");
       require(hasRole(CUSTODIAN_ROLE, account), "Custodian not registered");
-      require(custodian_count >= 7, "Must contain 7 custodians");
+      require(custodian_count > 7, "Must contain 7 custodians");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveCustodian,account)));
       if (getConsensus(indexhash, 1)) {
           _revokeRole(CUSTODIAN_ROLE, account);
