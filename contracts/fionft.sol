@@ -205,7 +205,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         uint256 tokenId;
         for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
             if (_owners[tokenId] == _owner) {
-                result[resultIndex] = string(abi.encodePacked(attribute[tokenId], ", ", Strings.toString(tokenId)));
+                result[resultIndex] = string(abi.encodePacked(attribute[tokenId], ": ", Strings.toString(tokenId)));
                 resultIndex++;
             }
         }
