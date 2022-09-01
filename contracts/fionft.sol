@@ -205,7 +205,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         uint256 tokenId;
         for (tokenId = 1; tokenId <= _tokenIds._value; tokenId++) {
             if (_owners[tokenId] == _owner) {
-                result[resultIndex] = attribute[tokenId];
+                result[resultIndex] = string(abi.encodePacked(attribute[tokenId], ": ", Strings.toString(tokenId)));
                 resultIndex++;
             }
         }
@@ -233,7 +233,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
 
     function unregoracle(address account) external onlyRole(CUSTODIAN_ROLE) {
       require(account != address(0), "Invalid account");
-      require(oracle_count > 0, "No oracles remaining");
+      require(oracle_count > 3, "Minimum 3 oracles required");
       bytes32 indexhash = keccak256(bytes(abi.encode(ApprovalType.RemoveOracle,account)));
       require(hasRole(ORACLE_ROLE, account), "Oracle not registered");
       if ( getConsensus(indexhash, 1)) {
