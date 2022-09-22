@@ -14,7 +14,6 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant CUSTODIAN_ROLE = keccak256("CUSTODIAN_ROLE");
@@ -57,9 +56,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
 
     constructor( address[] memory newcustodians)  ERC721("FIO Protocol NFT", "FIO") {
 
-      _grantRole(PAUSER_ROLE, msg.sender);
       _grantRole(OWNER_ROLE, msg.sender);
-
       require(newcustodians.length == 10, "Cannot deploy");
 
       for (uint8 i = 0; i < 10; i++ ) {
@@ -73,11 +70,11 @@ contract FIONFT is ERC721, Pausable, AccessControl {
       oracle_count = 0;
     }
 
-    function pause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenNotPaused{
+    function pause() external onlyRole(CUSTODIAN_ROLE) whenNotPaused{
         _pause();
     }
 
-    function unpause() external onlyRole(CUSTODIAN_ROLE) onlyRole(PAUSER_ROLE) whenPaused{
+    function unpause() external onlyRole(CUSTODIAN_ROLE) whenPaused{
         _unpause();
     }
 
