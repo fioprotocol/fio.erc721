@@ -5,12 +5,14 @@
 
 pragma solidity 0.8.7;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-contract FIONFT is ERC721, Pausable, AccessControl {
+
+contract FIONFT is ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
@@ -54,8 +56,11 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
     mapping(uint256 => address) private _owners;
 
-    constructor( address[] memory newcustodians)  ERC721("FIO Protocol NFT", "FIO") {
+    function initialize(string memory name, string memory symbol, address[] memory newcustodians) public {
 
+      __ERC721_init(name, symbol);
+      __AccessControl_init();
+      __Pausable_init();
       _grantRole(OWNER_ROLE, msg.sender);
       require(newcustodians.length == 10, "Cannot deploy");
 
@@ -160,7 +165,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
 
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721) {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override(ERC721Upgradeable) {
         require(to != address(this), "Cannot transfer to contract");
         super._beforeTokenTransfer(from, to, amount);
     }
@@ -170,7 +175,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, AccessControl)
+        override(ERC721Upgradeable, AccessControlUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
