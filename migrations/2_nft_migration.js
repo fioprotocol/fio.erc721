@@ -1,5 +1,6 @@
 const FIONFT = artifacts.require("FIONFT");
-var Custodians =[
+
+const CustodiansTestnet =[
   "0x2bFBc5e0e4ac9CF3dCE2512812Ef7Fa46031b506",
   "0xBA08B88cb85e8fDCCdfa2F59A415824d6BD634ca",
   "0xf55C6d387b440Ab78CF3475bD7f8aD7Af9F6716f",
@@ -10,8 +11,22 @@ var Custodians =[
   "0x12810A467e50338328b1cb6aD480969ac55765B9",
   "0x20CE1B955134c25a457A6AE688d4f53c6Ad53787",
   "0xC6770f6B7308Cc0b379D5A054A4a85aC85C2cFE4"
-]
-const CustodiansDev =[
+];
+
+const CustodiansDevnet =[
+  "0x2bFBc5e0e4ac9CF3dCE2512812Ef7Fa46031b506",
+  "0xBA08B88cb85e8fDCCdfa2F59A415824d6BD634ca",
+  "0xf55C6d387b440Ab78CF3475bD7f8aD7Af9F6716f",
+  "0xa1D386b970BEfA209b1FDa339974cD595dD99d7a",
+  "0xC9727FAad3E40771C4dE9701eBFf3B758E49B2e2",
+  "0x75aAEeC8513365D787842d4817319ce792d15aBC",
+  "0x267BF19766815Ab32cf7D05eD85a86fD947C8527",
+  "0x12810A467e50338328b1cb6aD480969ac55765B9",
+  "0x20CE1B955134c25a457A6AE688d4f53c6Ad53787",
+  "0xC6770f6B7308Cc0b379D5A054A4a85aC85C2cFE4"
+];
+
+const CustodiansLocal =[
   "0x825abC908237521012d8e5Dff76Bfe7cb7c0140c",
   "0x8c796f8ECfc49020ECB92eE9bb2da7E91b92A3F7",
   "0x53d1C568085d9B87439532e828DB94f96EF11B36",
@@ -24,9 +39,11 @@ const CustodiansDev =[
   "0xC6770f6B7308Cc0b379D5A054A4a85aC85C2cFE4"
 ]
 module.exports = async function (deployer, network) {
-  if (network == "development") {
-    await deployer.deploy(FIONFT, CustodiansDev);
-  } else {
-    await deployer.deploy(FIONFT, Custodians);
+  if (network === "mumbai_testnet") {
+    await deployer.deploy(FIONFT, CustodiansTestnet);
+  } else if (network === "mumbai_devnet") {
+    await deployer.deploy(FIONFT, CustodiansDevnet);
+  } else {  // Local deployment
+    await deployer.deploy(FIONFT, CustodiansLocal);
   }
 };

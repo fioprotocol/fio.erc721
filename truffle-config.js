@@ -2,7 +2,8 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 // create a file at the root of your project and name it .env -- there you can set process variables
 // like the mnemomic and Infura project key below. Note: .env is ignored by git to keep your private information safe
 require('dotenv').config();
-const mnemonic = process.env["MNEMONIC"];
+const mnemonicTestnet = process.env["MNEMONICTESTNET"];
+const mnemonicDevnet = process.env["MNEMONICDEVNET"];
 const appid = process.env["APP_ID"];
 const apikey = process.env["POLYGONSCAN_API_KEY"];
 
@@ -26,7 +27,16 @@ module.exports = {
     },
     //polygon matic testnet
     mumbai_testnet: {
-      provider: () => new HDWalletProvider(mnemonic, "https://polygon-mumbai.infura.io/v3/" + appid),
+      provider: () => new HDWalletProvider(mnemonicTestnet, "https://polygon-mumbai.infura.io/v3/" + appid),
+      network_id: 80001,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+      chainId: 80001
+    },
+    //polygon matic devnet
+    mumbai_devnet: {
+      provider: () => new HDWalletProvider(mnemonicDevnet, "https://polygon-mumbai.infura.io/v3/" + appid),
       network_id: 80001,
       confirmations: 2,
       timeoutBlocks: 200,
