@@ -187,9 +187,9 @@ contract FIONFT is ERC721, Pausable, AccessControl {
       return (hasRole(ORACLE_ROLE, account), uint32(oraclelist.length));
     }
 
-    function getApproval(bytes memory obtid) external view returns (uint32, bool) {
-      require(obtid.length > 0, "Invalid obtid");
-      return (approvals[bytes32(obtid)].approvals, approvals[bytes32(obtid)].complete);
+    function getApproval(bytes memory indexhash) external view returns (uint32, bool) {
+      require(indexhash.length > 0, "Invalid obtid");
+      return (approvals[bytes32(indexhash)].approvals, approvals[bytes32(indexhash)].complete);
     }
 
     function listDomainsOfOwner(address _owner) public view returns(string[] memory ownerTokens) {
