@@ -3,21 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "npx truffle compile",
-    "migrate-dev": "npx truffle migrate --network development",
-    "migrate-rinkeby": "npx truffle migrate --network mumbai",
-    "migrate-mainnet": "npx truffle migrate --network mainnet",
-    "test": "npx truffle test",
-    "dev": "npx truffle console --network development",
-    "dev-mumbai": "npx truffle console --network mumbai",
-    "start-network": "npx ganache-cli"
+    "truffle-build": "npx truffle compile",
+    "truffle-migrate-dev": "npx truffle migrate --network development",
+    "truffle-migrate-rinkeby": "npx truffle migrate --network mumbai",
+    "truffle-migrate-mainnet": "npx truffle migrate --network mainnet",
+    "truffle-test": "npx truffle test",
+    "truffle-dev": "npx truffle console --network development",
+    "truffle-dev-mumbai": "npx truffle console --network mumbai",
+    "truffle-start-network": "npx ganache-cli",
+    "hardhat-compile": "npx hardhat compile"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.0",
     "@openzeppelin/contracts-upgradeable": "^4.8.0-rc.1",
     "@truffle/hdwallet-provider": "^1.7.0",
     "dotenv": "^10.0.0",
-    "solc": "^0.8.7"
+    "solc": "^0.8.7",
+    "hardhat": "^2.3.0",
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "@nomiclabs/hardhat-etherscan": "^3.1.0"
   },
   "devDependencies": {
     "truffle-plugin-verify": "^0.5.26"
