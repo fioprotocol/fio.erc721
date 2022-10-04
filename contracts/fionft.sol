@@ -10,9 +10,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-
-contract FIONFT is ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract FIONFT is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
@@ -56,7 +56,7 @@ contract FIONFT is ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradea
     mapping ( bytes32 => pending ) approvals; // uint256 hash can be any obtid
     mapping(uint256 => address) private _owners;
 
-    function initialize(string memory name, string memory symbol, address[] memory newcustodians) public {
+    function initialize(string memory name, string memory symbol, address[] memory newcustodians) public initializer {
 
       __ERC721_init(name, symbol);
       __AccessControl_init();
