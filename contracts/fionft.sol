@@ -41,11 +41,11 @@ contract FIONFT is ERC721, Pausable, AccessControl {
     event unwrapped(string fioaddress, string domain);
     event wrapped(address account, string domain, string obtid);
     event domainburned(address account, uint256 tokenId, string obtid);
-    event custodian_unregistered(address account, bytes32 eid);
-    event custodian_registered(address account, bytes32 eid);
-    event oracle_unregistered(address account, bytes32 eid);
-    event oracle_registered(address account, bytes32 eid);
-    event consensus_activity(string signer, bytes32 hash);
+    event custodian_unregistered(address account, bytes32 indexhash);
+    event custodian_registered(address account, bytes32 indexhash);
+    event oracle_unregistered(address account, bytes32 indexhash);
+    event oracle_registered(address account, bytes32 indexhash);
+    event consensus_activity(string signer, address account, string obtid, bytes32 indexhash);
 
     address[] public oraclelist;
     address[] private custodianlist;
@@ -129,7 +129,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
          emit wrapped(account, domain, obtid);
         _owners[tokenId] = account;
       }
-        emit consensus_activity("oracle", indexhash);
+        emit consensus_activity("oracle", msg.sender, "", indexhash);
         return tokenId;
     }
 
@@ -155,7 +155,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         _owners[tokenId] = address(0);
       }
 
-        emit consensus_activity("oracle", indexhash);
+        emit consensus_activity("oracle", msg.sender, "", indexhash);
         return tokenId;
 
     }
@@ -186,10 +186,17 @@ contract FIONFT is ERC721, Pausable, AccessControl {
       require(account != address(0), "Invalid account");
       return (hasRole(ORACLE_ROLE, account), uint32(oraclelist.length));
     }
-
-    function getApproval(bytes memory obtid) external view returns (uint32, bool) {
-      require(obtid.length > 0, "Invalid obtid");
-      return (approvals[bytes32(obtid)].approvals, approvals[bytes32(obtid)].complete);
+    function getApproval(bytes memory indexhash) external view returns (uint32, bool, address[] memory) {
+      require(indexhash.length > 0, "Invalid obtid");
+      address[] memory approvedOracles = new address[](approvals[bytes32(indexhash)].approvals);
+      uint32 c = 0;
+      for(uint32 i = 0; i < oraclelist.length; i++) {
+        if (approvals[bytes32(indexhash)].approved[oraclelist[i]]) {
+          approvedOracles[c] = oraclelist[i];
+          c++;
+        }
+      }
+      return (approvals[bytes32(indexhash)].approvals, approvals[bytes32(indexhash)].complete, approvedOracles);
     }
 
     function listDomainsOfOwner(address _owner) public view returns(string[] memory ownerTokens) {
@@ -225,7 +232,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         oraclelist.push(account);
         emit oracle_registered(account, indexhash);
       }
-      emit consensus_activity("custodian", indexhash);
+      emit consensus_activity("custodian", msg.sender, "", indexhash);
     }
 
     function unregoracle(address account) external onlyRole(CUSTODIAN_ROLE) {
@@ -245,7 +252,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
           }
           emit oracle_unregistered(account, indexhash);
       }
-       emit consensus_activity("custodian", indexhash);
+       emit consensus_activity("custodian", msg.sender, "", indexhash);
 
     } // unregoracle
 
@@ -260,7 +267,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         custodianlist.push(account);
         emit custodian_registered(account, indexhash);
       }
-      emit consensus_activity("custodian", indexhash);
+      emit consensus_activity("custodian", msg.sender, "", indexhash);
     }
 
     function unregcust(address account) external onlyRole(CUSTODIAN_ROLE) {
@@ -280,7 +287,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
           }
           emit custodian_unregistered(account, indexhash);
       }
-      emit consensus_activity("custodian", indexhash);
+      emit consensus_activity("custodian", msg.sender, "", indexhash);
     } //unregcustodian
 
       // ------------------------------------------------------------------------
