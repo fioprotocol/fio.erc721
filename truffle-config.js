@@ -1,8 +1,8 @@
 const HDWalletProvider = require('@truffle/hdwallet-provider');
 // create a file at the root of your project and name it .env -- there you can set process variables
-// like the mnemomic and Infura project key below. Note: .env is ignored by git to keep your private information safe
 require('dotenv').config();
-const mnemonic = process.env["MNEMONIC"];
+const mnemonicDevnet = process.env["MNEMONIC_DEVNET"];
+const mnemonicTestnet = process.env["MNEMONIC_TESTNET"];
 const appid = process.env["APP_ID"];
 const apikey = process.env["POLYGONSCAN_API_KEY"];
 
@@ -24,12 +24,20 @@ module.exports = {
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
     },
-    //polygon matic testnet
+    // Was getting "FIONFT could not deploy due to insufficient funds" with out gas and gasPrice
+    // Current price: https://api-testnet.polygonscan.com/api?module=proxy&action=eth_gasPrice&apikey=YourApiKeyToken
+    mumbai_devnet: {
+      provider: () => new HDWalletProvider(mnemonicDevnet, "https://polygon-mumbai.infura.io/v3/" + appid),
+      network_id: 80001,
+      //gas: 9000000,            // Gas Limit, default is 6721975, mumbai migration returned (overall) Block gas limit: 21102957
+      //gasPrice: 20000000000,    // Default is 20000000000 (20 Gwei)
+      timeoutBlocks: 50,
+    },
     mumbai_testnet: {
-      provider: () => new HDWalletProvider(mnemonic, "https://polygon-mumbai.infura.io/v3/" + appid),
+      provider: () => new HDWalletProvider(mnemonicTestnet, "https://polygon-mumbai.infura.io/v3/" + appid),
       network_id: 80001,
       confirmations: 2,
-      timeoutBlocks: 200,
+      timeoutBlocks: 50,
       skipDryRun: true,
       chainId: 80001
     }
