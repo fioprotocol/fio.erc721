@@ -129,7 +129,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
          emit wrapped(account, domain, obtid);
         _owners[tokenId] = account;
       }
-        emit consensus_activity("oracle", msg.sender, "", indexhash);
+        emit consensus_activity("oracle", msg.sender, obtid, indexhash);
         return tokenId;
     }
 
@@ -155,7 +155,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         _owners[tokenId] = address(0);
       }
 
-        emit consensus_activity("oracle", msg.sender, "", indexhash);
+        emit consensus_activity("oracle", msg.sender, obtid, indexhash);
         return tokenId;
 
     }
