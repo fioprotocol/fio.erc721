@@ -103,7 +103,7 @@ contract FIONFT is ERC721, Pausable, AccessControl {
         require(!approvals[hash].approved[msg.sender], "sender has already approved this hash");
         approvals[hash].approved[msg.sender] = true;
         approvals[hash].approvals++;
-         //moving this if block after the parent if block will allow the execution to take place immediately instead of requiring a subsequent call 
+         //moving this if block after the parent if block will allow the execution to take place immediately instead of requiring a subsequent call
         if (approvals[hash].approvals >= APPROVALS_NEEDED) {
           require(approvals[hash].approved[msg.sender], "An approver must execute");
           approvals[hash].complete = true;
@@ -294,9 +294,13 @@ contract FIONFT is ERC721, Pausable, AccessControl {
       // Don't accept ETH
       // ------------------------------------------------------------------------
 
-
     receive () external payable {
       revert();
+    }
+
+    function changeOwner(address account) external onlyRole(OWNER_ROLE) {
+      _revokeRole(OWNER_ROLE, msg.sender);
+      _grantRole(OWNER_ROLE, account);
     }
 
 }
