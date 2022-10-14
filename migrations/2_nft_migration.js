@@ -10,7 +10,7 @@ module.exports = async function (deployer, network) {
     await deployer.deploy(FIONFT, custodiansLocal);
   } else if (network == "mumbai_devnet") {
     await deployer.deploy(FIONFT, custodiansDevnet);
-  } else if (network == "mumbai_testnet") {
+  } else if (network == "mumbai_testnet" | network == "goerli_testnet") {
     await deployer.deploy(FIONFT, custodiansTestnet);
   }
 };
