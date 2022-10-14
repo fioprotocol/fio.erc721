@@ -4,7 +4,8 @@ require('dotenv').config();
 const mnemonicDevnet = process.env["MNEMONIC_DEVNET"];
 const mnemonicTestnet = process.env["MNEMONIC_TESTNET"];
 const appid = process.env["APP_ID"];
-const apikey = process.env["POLYGONSCAN_API_KEY"];
+const apikeyPoloygonscan = process.env["POLYGONSCAN_API_KEY"];
+const apikeyEtherscan = process.env["ETHERSCAN_API_KEY"];
 
 module.exports = {
 
@@ -38,9 +39,15 @@ module.exports = {
       network_id: 80001,
       confirmations: 2,
       timeoutBlocks: 50,
-      skipDryRun: true,
-      chainId: 80001
-    }
+    },
+    goerli_testnet: {
+      provider: () => new HDWalletProvider(mnemonicTestnet, 'https://goerli.infura.io/v3/' + appid),
+      network_id: 5,
+      gas: 9000000,
+      confirmations: 2,    // # of confs to wait between deployments. (default: 0)
+      timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
+      skipDryRun: false     // Skip dry run before migrations? (default: false for public nets )
+    },
   },
 
   // Set default mocha options here, use special reporters etc.
@@ -67,9 +74,10 @@ module.exports = {
     enabled: true
   },
 
-  // Used to automatically verifiy the contract on etherscan
+  // Used to automatically verifiy the contract
   api_keys: {
-    polygonscan: apikey,
+    polygonscan: apikeyPoloygonscan,
+    //etherscan: apikeyEtherscan,
   },
   plugins: [
     'truffle-plugin-verify'
