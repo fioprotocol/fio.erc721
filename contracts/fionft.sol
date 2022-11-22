@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // FIO Protocol ERC721 and Oracle Contract
 // Adam Androulidakis 3/2021
-// Prototype: Do not use in production
 
 pragma solidity 0.8.7;
 
