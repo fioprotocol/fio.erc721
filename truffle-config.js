@@ -3,6 +3,7 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 require('dotenv').config();
 const mnemonicDevnet = process.env["MNEMONIC_DEVNET"];
 const mnemonicTestnet = process.env["MNEMONIC_TESTNET"];
+const mnemonicMainnet = process.env["MNEMONIC_MAINNET"];
 const appid = process.env["APP_ID"];
 const apikeyPoloygonscan = process.env["POLYGONSCAN_API_KEY"];
 const apikeyEtherscan = process.env["ETHERSCAN_API_KEY"];
@@ -43,10 +44,19 @@ module.exports = {
     goerli_testnet: {
       provider: () => new HDWalletProvider(mnemonicTestnet, 'https://goerli.infura.io/v3/' + appid),
       network_id: 5,
-      gas: 9000000,
+      gas: 9000000,        // Gas limit
       confirmations: 2,    // # of confs to wait between deployments. (default: 0)
       timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
       skipDryRun: false     // Skip dry run before migrations? (default: false for public nets )
+    },
+    polygon: {
+      provider: () => new HDWalletProvider(mnemonicMainnet, 'https://polygon-mainnet.infura.io/v3/' + appid),
+      network_id: 137,
+      gas: 5400000,
+      gasPrice: 250000000000,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: false
     },
   },
 
