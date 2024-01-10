@@ -1,5 +1,5 @@
 {
-  "name": "fio.erc20",
+  "name": "@fioprotocol/fio.erc721",
   "version": "0.1.0",
   "private": true,
   "scripts": {
